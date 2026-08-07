@@ -1,0 +1,1346 @@
+"use client";
+
+import { useState, useEffect, useRef } from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import { db, storage } from "@/lib/firebase";
+import {
+  ref,
+  onValue,
+  push,
+  set,
+  serverTimestamp,
+  remove,
+} from "firebase/database";
+import {
+  ref as storageRef,
+  uploadBytesResumable,
+  getDownloadURL,
+} from "firebase/storage";
+import { useAuth } from "@/context/AuthContext";
+import {
+  ArrowLeft,
+  Heart,
+  MessageCircle,
+  Share2,
+  Upload,
+  X,
+  Music,
+  User,
+  Loader2,
+  Play,
+  Send,
+  Trash2,
+  Volume2,
+  VolumeX,
+  Disc,
+  Sparkles,
+} from "lucide-react";
+import Link from "next/link";
+
+// केवल 10 फुल एचडी अपना निम्बोडा ग्राम पोस्ट्स (1 से 10)
+export const DEFAULT_VILLAGE_POSTS = [
+  {
+    id: "post_1",
+    mediaUrl: "/posts/post1.jpg",
+    mediaType: "image",
+    caption:
+      "🌅 स्वागतम् - ग्राम निम्बोडा (343029)\n\nहमारे गांव का स्वर्णिम प्रवेश द्वार और लहलहाते हरे-भरे खेत।\n#ApnaNimboda #Rajasthan #VillageLife #343029",
+    authorId: "admin",
+    authorHandle: "nimboda_official",
+    authorName: "अपना निम्बोडा",
+    authorPhoto: "/icon-192.jpg",
+    songName: "Kesariya Balam (Rajasthani Desert Flute)",
+    artistName: "Marwad Folk Studio",
+    audioUrl:
+      "https://cdn.pixabay.com/download/audio/2022/05/27/audio_1808fbf07a.mp3?filename=indian-flute-meditation-112191.mp3",
+    createdAt: 1785812728489,
+    likes: { l1: true, l2: true, l3: true, l4: true, l5: true },
+    comments: {
+      c1: {
+        userId: "guest_suresh",
+        userName: "सुरेश चौधरी",
+        userPhoto: "",
+        text: "बहुत ही भव्य प्रवेश द्वार! जय निम्बोडा 🙏",
+        timestamp: 1785812730000,
+      },
+      c2: {
+        userId: "guest_dinesh",
+        userName: "दिनेश कुमार",
+        userPhoto: "",
+        text: "हमारा प्यारा गांव निम्बोडा ❤️",
+        timestamp: 1785812735000,
+      },
+    },
+  },
+  {
+    id: "post_2",
+    mediaUrl: "/posts/post2.jpg",
+    mediaType: "image",
+    caption:
+      "💻 डिजिटल भारत - डिजिटल निम्बोडा!\n\nतकनीकी शिक्षा, स्मार्ट डायरेक्टरी और युवा नवाचार से सशक्त ग्राम पंचायत निम्बोडा।\n#DigitalNimboda #YouthEmpowerment #SmartVillage",
+    authorId: "admin",
+    authorHandle: "digital_nimboda",
+    authorName: "डिजिटल निम्बोडा",
+    authorPhoto: "/icon-192.jpg",
+    songName: "Digital India Ambience & Inspiring Beats",
+    artistName: "Youth Energy Studio",
+    audioUrl:
+      "https://cdn.pixabay.com/download/audio/2022/01/18/audio_d0a13f69d2.mp3?filename=inspiring-cinematic-ambient-116199.mp3",
+    createdAt: 1785812748764,
+    likes: { l1: true, l2: true, l3: true, l4: true },
+    comments: {
+      c1: {
+        userId: "guest_ramesh",
+        userName: "रमेश जी",
+        userPhoto: "",
+        text: "डिजिटल निम्बोडा की नई शुरुआत! 🚀",
+        timestamp: 1785812750000,
+      },
+    },
+  },
+  {
+    id: "post_3",
+    mediaUrl: "/posts/post3.jpg",
+    mediaType: "image",
+    caption:
+      "🌅 मारवाड़ री पावन धरा - निम्बोडा री सुंदर प्रभात 🦚\n\nचहचहाते राष्ट्रीय पक्षी मोर, शुद्ध शीतल बयार और हमारे गांव की अनुपम प्राकृतिक छटा।\n#NimbodaMorning #PrakritiSondarya #Marwad #ApnaNimboda #343029",
+    authorId: "admin",
+    authorHandle: "prakriti_nimboda",
+    authorName: "प्राकृतिक धरोहर",
+    authorPhoto: "/icon-192.jpg",
+    songName: "Padharo Mhare Desh (Sarangi & Flute)",
+    artistName: "Desert Melody Records",
+    audioUrl:
+      "https://cdn.pixabay.com/download/audio/2022/03/15/audio_c8c8a73502.mp3?filename=meditation-peace-110055.mp3",
+    createdAt: 1785812966979,
+    likes: { l1: true, l2: true, l3: true, l4: true, l5: true },
+    comments: {
+      c1: {
+        userId: "guest_prakash",
+        userName: "प्रकाश पटेल",
+        userPhoto: "",
+        text: "हमारे गांव की सुबह सबसे मनमोहक है! 🦚✨",
+        timestamp: 1785812970000,
+      },
+    },
+  },
+  {
+    id: "post_4",
+    mediaUrl: "/posts/post4.jpg",
+    mediaType: "image",
+    caption:
+      "📚 GOVT. SENIOR SECONDARY SCHOOL, NIMBODA (BHINMAL) JALORE 🏫\n\nपढ़ेगा निम्बोडा तभी तो बढ़ेगा निम्बोडा! अनुशासन, गुणवत्तापूर्ण शिक्षा और विद्यार्थियों का उज्ज्वल भविष्य।\n#GovtSchoolNimboda #EducationForAll #Bhinmal #Jalore #YouthEducation",
+    authorId: "admin",
+    authorHandle: "nimboda_school",
+    authorName: "राजकीय उच्च माध्यमिक विद्यालय",
+    authorPhoto: "/icon-192.jpg",
+    songName: "Govt. Sr. Sec. School Anthem (Inspiring Strings)",
+    artistName: "Shiksha Mission Vibes",
+    audioUrl:
+      "https://cdn.pixabay.com/download/audio/2022/10/14/audio_9939f792cb.mp3?filename=inspiring-emotional-uplifting-piano-122986.mp3",
+    createdAt: 1785812994243,
+    likes: { l1: true, l2: true, l3: true, l4: true, l5: true, l6: true },
+    comments: {
+      c1: {
+        userId: "guest_master",
+        userName: "मास्टर जी",
+        userPhoto: "",
+        text: "शिक्षा ही सबसे बड़ी ताकत है। 🎓",
+        timestamp: 1785813000000,
+      },
+      c2: {
+        userId: "guest_student",
+        userName: "अनिल सुथार",
+        userPhoto: "",
+        text: "हमारा प्यारा स्कूल! गर्व है।",
+        timestamp: 1785813005000,
+      },
+    },
+  },
+  {
+    id: "post_5",
+    mediaUrl: "/posts/post5.jpg",
+    mediaType: "image",
+    caption:
+      "🎓 युवा शक्ति व उच्च शिक्षा (Youth Inspiration) 🌟\n\nनिम्बोडा के कर्मठ युवाओं का संकल्प: IAS, RAS, शिक्षक, सेना, पुलिस, इंजीनियरिंग व प्रतियोगी परीक्षाओं में सर्वोच्च सफलता हासिल करना! मेहनत ही सफलता की कुंजी है। 💪🔥\n#YouthMotivation #HigherEducation #DreamBig #NimbodaPride",
+    authorId: "admin",
+    authorHandle: "yuva_prerna",
+    authorName: "युवा प्रेरणा मंच निम्बोडा",
+    authorPhoto: "/icon-192.jpg",
+    songName: "Lakshya Yuva Prerna (Epic Motivational Beats)",
+    artistName: "Ambition & Success",
+    audioUrl:
+      "https://cdn.pixabay.com/download/audio/2021/08/04/audio_12b0c7443c.mp3?filename=ambient-piano-amp-strings-10711.mp3",
+    createdAt: 1785813008000,
+    likes: { l1: true, l2: true, l3: true, l4: true, l5: true },
+    comments: {
+      c1: {
+        userId: "guest_vikram",
+        userName: "विक्रम राजपुरोहित",
+        userPhoto: "",
+        text: "मेहनत ही सफलता की कुंजी है! 💪",
+        timestamp: 1785813012000,
+      },
+    },
+  },
+  {
+    id: "post_6",
+    mediaUrl: "/posts/post6.jpg",
+    mediaType: "image",
+    caption:
+      "🎉 मारवाड़ री शान, निम्बोडा रा पारंपरिक उत्सव एवं घूमर लोक संस्कृति!\n\nरंग-बिरंगी पोशाकें, साफ़ा और ढोल-थाली री धुन। संस्कृति ही हमारी पहचान है।\n#RajasthaniCulture #Ghoomar #Marwad #Heritage",
+    authorId: "admin",
+    authorHandle: "nimboda_culture",
+    authorName: "सांस्कृतिक मंच",
+    authorPhoto: "/icon-192.jpg",
+    songName: "Ghoomar Rajasthani Folk Rhythm & Dholak",
+    artistName: "Marwadi Folk Heritage",
+    audioUrl:
+      "https://cdn.pixabay.com/download/audio/2023/02/28/audio_551f33f92d.mp3?filename=traditional-folk-acoustic-140882.mp3",
+    createdAt: 1785813010471,
+    likes: { l1: true, l2: true, l3: true, l4: true },
+    comments: {
+      c1: {
+        userId: "guest_kamlesh",
+        userName: "कमलेश देवासी",
+        userPhoto: "",
+        text: "जय मारवाड़! जय राजस्थान! 🚩",
+        timestamp: 1785813015000,
+      },
+    },
+  },
+  {
+    id: "post_7",
+    mediaUrl: "/posts/post7.jpg",
+    mediaType: "image",
+    caption:
+      "🌾 जय जवान, जय किसान!\n\nहमारे अन्नदाता किसान भाईयों की अथक मेहनत, सोलर सिंचाई और निम्बोडा की उपजाऊ धरती पर लहलहाती फसलें।\n#KisanEkta #SmartFarming #Nimboda #Annadata",
+    authorId: "admin",
+    authorHandle: "kisan_nimboda",
+    authorName: "किसान मंच निम्बोडा",
+    authorPhoto: "/icon-192.jpg",
+    songName: "Dharti Dhora Ri (Soulful Desert Strings)",
+    artistName: "Folk Rajasthan Tunes",
+    audioUrl:
+      "https://cdn.pixabay.com/download/audio/2022/11/06/audio_96a0cc6bc0.mp3?filename=cinematic-melody-124976.mp3",
+    createdAt: 1785813028174,
+    likes: { l1: true, l2: true, l3: true, l4: true, l5: true },
+    comments: {
+      c1: {
+        userId: "guest_bhoma",
+        userName: "भोमाराम जी",
+        userPhoto: "",
+        text: "किसान खुशहाल तो देश खुशहाल! 🌾",
+        timestamp: 1785813030000,
+      },
+    },
+  },
+  {
+    id: "post_8",
+    mediaUrl: "/posts/post8.jpg",
+    mediaType: "image",
+    caption:
+      "📮 ई-मित्र एवं डिजिटल नागरिक सेवा केंद्र\n\nसरकारी योजनाओं, प्रमाण पत्र, जन आधार एवं बैंकिंग सेवाओं का लाभ अब सीधे गांव में ही।\n#EMitra #DigitalServices #Nimboda343029",
+    authorId: "admin",
+    authorHandle: "emitra_nimboda",
+    authorName: "ई-मित्र सेवा केंद्र",
+    authorPhoto: "/icon-192.jpg",
+    songName: "Digital Citizen Ambient Chimes",
+    artistName: "Smart Services India",
+    audioUrl:
+      "https://cdn.pixabay.com/download/audio/2022/08/02/audio_884fe92c21.mp3?filename=epic-heroic-cinematic-116492.mp3",
+    createdAt: 1785813040000,
+    likes: { l1: true, l2: true, l3: true },
+    comments: {
+      c1: {
+        userId: "guest_ashok",
+        userName: "अशोक कुमार",
+        userPhoto: "",
+        text: "घर बैठे सारी सुविधाएं मिल रही हैं। बहुत बढ़िया!",
+        timestamp: 1785813045000,
+      },
+    },
+  },
+  {
+    id: "post_9",
+    mediaUrl: "/posts/post9.jpg",
+    mediaType: "image",
+    caption:
+      "🤝 भाईचारा, चौपाल एवं सामाजिक एकता\n\nनिम्बोडा वासियों का अटूट स्नेह, सहयोग, आपसी प्रेम और गांव विकास की सार्थक चर्चा।\n#VillageCommunity #Chaupal #Ekta #ApnaGaon",
+    authorId: "admin",
+    authorHandle: "yuva_nimboda",
+    authorName: "ग्राम चौपाल मंच",
+    authorPhoto: "/icon-192.jpg",
+    songName: "Banyan Tree Harmony (Peaceful Ektara)",
+    artistName: "Village Unity Music",
+    audioUrl:
+      "https://cdn.pixabay.com/download/audio/2022/03/10/audio_c36195c873.mp3?filename=indian-sitar-ambient-109283.mp3",
+    createdAt: 1785813050000,
+    likes: { l1: true, l2: true, l3: true, l4: true, l5: true },
+    comments: {
+      c1: {
+        userId: "guest_mukesh",
+        userName: "मुकेश सुथार",
+        userPhoto: "",
+        text: "एकता में ही शक्ति है। जय निम्बोडा!",
+        timestamp: 1785813055000,
+      },
+    },
+  },
+  {
+    id: "post_10",
+    mediaUrl: "/posts/post10.jpg",
+    mediaType: "image",
+    caption:
+      "🛕 श्री निम्बोडा धाम एवं ऐतिहासिक प्राचीन मंदिर (343029)\n\nसुख, शांति, समृद्धि और सर्वकल्याण की पावन मंगल कामना।\n#NimbodaDham #SacredTemple #Bhinmal #Rajasthan #Devotion",
+    authorId: "admin",
+    authorHandle: "heritage_nimboda",
+    authorName: "श्री निम्बोडा धाम",
+    authorPhoto: "/icon-192.jpg",
+    songName: "Achyutam Keshavam (Morning Aarti & Temple Bells)",
+    artistName: "Bhakti Nimboda Studio",
+    audioUrl:
+      "https://cdn.pixabay.com/download/audio/2022/04/27/audio_67e9140ecb.mp3?filename=spiritual-meditation-111162.mp3",
+    createdAt: 1785813070000,
+    likes: { l1: true, l2: true, l3: true, l4: true, l5: true, l6: true },
+    comments: {
+      c1: {
+        userId: "guest_shanti",
+        userName: "शांतिलाल जी",
+        userPhoto: "",
+        text: "जय हो निम्बोडा धाम की! सबका कल्याण हो 🙏",
+        timestamp: 1785813075000,
+      },
+    },
+  },
+  {
+    id: "post_11",
+    mediaUrl: "/posts/anti_drug_1.jpg",
+    mediaType: "image",
+    caption:
+      "🚫 नशा नाश का द्वार है! 🚫\n\nशराब, स्मैक और MD जैसे नशे सिर्फ एक इंसान को नहीं, पूरे हंसते-खेलते परिवार को खत्म कर देते हैं। अपने गाँव निम्बोड़ा को नशे से मुक्त बनाएँ।\n#SayNoToDrugs #AntiDrug #Nimboda #Awareness #ApnaNimboda",
+    authorId: "admin",
+    authorHandle: "nimboda_awareness",
+    authorName: "गाँव जागरूकता मंच",
+    authorPhoto: "/icon-192.jpg",
+    songName: "Aarambh Hai Prachand (Motivational)",
+    artistName: "Youth Awakening",
+    audioUrl:
+      "https://cdn.pixabay.com/download/audio/2022/11/22/audio_196324a0d9.mp3?filename=motivational-epic-125950.mp3",
+    createdAt: 1785901478549,
+    likes: { l1: true, l2: true, l3: true },
+    comments: {},
+  },
+  {
+    id: "post_12",
+    mediaUrl: "/posts/anti_drug_2.jpg",
+    mediaType: "image",
+    caption:
+      "⛓️ नशे की जंजीरें तोड़ो, भविष्य की ओर दौड़ो! 🏃‍♂️\n\nयुवाओं से अपील: स्मैक और MD की लत को छोड़ें और खेल-कूद, पढ़ाई और अपने भविष्य पर ध्यान दें। आपका भविष्य आपके हाथ में है।\n#YouthPower #DrugFreeNimboda #Future",
+    authorId: "admin",
+    authorHandle: "nimboda_awareness",
+    authorName: "गाँव जागरूकता मंच",
+    authorPhoto: "/icon-192.jpg",
+    songName: "Zindagi Ek Safar (Inspiring Beats)",
+    artistName: "Hope Records",
+    audioUrl:
+      "https://cdn.pixabay.com/download/audio/2022/01/18/audio_d0a13f69d2.mp3?filename=inspiring-cinematic-ambient-116199.mp3",
+    createdAt: 1785901502516,
+    likes: { l1: true, l2: true, l3: true, l4: true },
+    comments: {},
+  },
+  {
+    id: "post_13",
+    mediaUrl: "/posts/anti_drug_3.jpg",
+    mediaType: "image",
+    caption:
+      "🤝 गाँव की एकता - नशे की हार! 🤝\n\nगाँव के बुजुर्ग और युवा आज एक साथ खड़े हैं। आइए मिलकर शपथ लें कि अपने प्यारे गाँव निम्बोड़ा में किसी भी तरह का नशा नहीं पनपने देंगे।\n#Unity #MarwadiCulture #ApnaNimboda #SayNoToDrugs",
+    authorId: "admin",
+    authorHandle: "nimboda_awareness",
+    authorName: "गाँव जागरूकता मंच",
+    authorPhoto: "/icon-192.jpg",
+    songName: "Maa Tharo Mharo (Emotional Folk)",
+    artistName: "Desert Melody Records",
+    audioUrl:
+      "https://cdn.pixabay.com/download/audio/2022/03/15/audio_c8c8a73502.mp3?filename=meditation-peace-110055.mp3",
+    createdAt: 1785901544337,
+    likes: { l1: true, l2: true, l3: true, l4: true, l5: true },
+    comments: {},
+  },
+];
+
+// Component for Reel
+const Reel = ({
+  reel,
+  isActive,
+  onLike,
+  currentUserId,
+  onCommentClick,
+  isAudioPlaying,
+  onToggleAudio,
+}: any) => {
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const [isVideoPlaying, setIsVideoPlaying] = useState(false);
+  const [showHeartAnim, setShowHeartAnim] = useState(false);
+  const lastTapRef = useRef<number>(0);
+  const isLiked = currentUserId && reel.likes && reel.likes[currentUserId];
+
+  const isVideo = reel.mediaType === "video";
+  const mediaSrc = reel.mediaUrl || reel.videoUrl;
+  const songTitle = reel.songName || "Rajasthani Folk & Ambient Beats";
+  const artistTitle = reel.artistName || "Apna Nimboda Music";
+
+  // Video Autoplay when active
+  useEffect(() => {
+    if (isVideo && videoRef.current) {
+      if (isActive) {
+        videoRef.current
+          .play()
+          .then(() => setIsVideoPlaying(true))
+          .catch(() => setIsVideoPlaying(false));
+      } else {
+        videoRef.current.pause();
+        setIsVideoPlaying(false);
+      }
+    }
+  }, [isActive, isVideo]);
+
+  // Double tap to like
+  const handleDoubleTap = () => {
+    const now = Date.now();
+    if (now - lastTapRef.current < 300) {
+      if (!isLiked) {
+        onLike(reel.id);
+      }
+      setShowHeartAnim(true);
+      setTimeout(() => setShowHeartAnim(false), 900);
+    }
+    lastTapRef.current = now;
+  };
+
+  const toggleVideoPlayback = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (isVideo && videoRef.current) {
+      if (isVideoPlaying) {
+        videoRef.current.pause();
+        setIsVideoPlaying(false);
+      } else {
+        videoRef.current.play();
+        setIsVideoPlaying(true);
+      }
+    }
+  };
+
+  const handleShare = async () => {
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: `${reel.authorName || "Post"} - APNA NIMBODA`,
+          text: reel.caption,
+          url: window.location.href,
+        });
+      } catch (err) {}
+    } else {
+      window.open(
+        `https://api.whatsapp.com/send?text=${encodeURIComponent(reel.caption + "\n\n" + window.location.href)}`,
+        "_blank",
+      );
+    }
+  };
+
+  return (
+    <div
+      onClick={handleDoubleTap}
+      className="relative w-full h-full snap-start snap-always bg-black flex justify-center items-center overflow-hidden select-none"
+    >
+      {/* Media Element: Image or Video */}
+      {isVideo ? (
+        <div
+          className="relative w-full h-full flex items-center justify-center bg-black cursor-pointer"
+          onClick={toggleVideoPlayback}
+        >
+          <video
+            ref={videoRef}
+            src={mediaSrc}
+            className="w-full h-full object-cover"
+            loop
+            playsInline
+            onContextMenu={(e) => e.preventDefault()}
+          />
+          {!isVideoPlaying && (
+            <div className="absolute inset-0 flex items-center justify-center bg-black/30 backdrop-blur-[2px] transition-all">
+              <div className="w-16 h-16 rounded-full bg-black/60 border border-white/20 flex items-center justify-center text-white shadow-2xl scale-110">
+                <Play className="w-8 h-8 ml-1 fill-white" />
+              </div>
+            </div>
+          )}
+        </div>
+      ) : (
+        <div className="relative w-full h-full flex items-center justify-center bg-zinc-950 overflow-hidden">
+          <img
+            src={mediaSrc}
+            alt={reel.caption || "Post"}
+            onContextMenu={(e) => e.preventDefault()}
+            className="w-full h-full object-cover transition-transform duration-1000 ease-out hover:scale-105"
+          />
+        </div>
+      )}
+
+      {/* Double Tap Heart Burst Animation */}
+      <AnimatePresence>
+        {showHeartAnim && (
+          <motion.div
+            initial={{ scale: 0, opacity: 0 }}
+            animate={{ scale: [0, 1.4, 1], opacity: [0, 1, 0.9] }}
+            exit={{ scale: 1.6, opacity: 0 }}
+            transition={{ duration: 0.8, ease: "easeOut" }}
+            className="absolute inset-0 flex items-center justify-center pointer-events-none z-30"
+          >
+            <Heart className="w-28 h-28 text-rose-500 fill-rose-500 drop-shadow-[0_0_35px_rgba(244,63,94,0.9)]" />
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Right Action Bar */}
+      <div className="absolute right-3.5 bottom-20 flex flex-col items-center gap-5 z-20">
+        {/* Profile Pic with golden border */}
+        <div className="relative group cursor-pointer mb-1">
+          <div className="w-11 h-11 rounded-full border-2 border-amber-400 overflow-hidden bg-gradient-to-tr from-amber-500 to-rose-500 flex items-center justify-center shadow-lg">
+            {reel.authorPhoto ? (
+              <img
+                src={reel.authorPhoto}
+                alt="Profile"
+                className="w-full h-full object-cover"
+              />
+            ) : (
+              <User className="w-6 h-6 text-white" />
+            )}
+          </div>
+          <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-4 h-4 bg-amber-500 rounded-full flex items-center justify-center border border-black text-[9px] font-bold text-black">
+            ✓
+          </div>
+        </div>
+
+        {/* Like Button */}
+        <button
+          onClick={() => onLike(reel.id)}
+          className="flex flex-col items-center gap-1 group active:scale-90 transition-transform"
+        >
+          <Heart
+            className={`w-7 h-7 transition-transform drop-shadow-md ${isLiked ? "fill-rose-500 text-rose-500 scale-110" : "text-white hover:scale-110"}`}
+          />
+          <span className="text-white text-xs font-bold drop-shadow-md">
+            {reel.likes ? Object.keys(reel.likes).length : 0}
+          </span>
+        </button>
+
+        {/* Comment Button */}
+        <button
+          onClick={() => onCommentClick(reel)}
+          className="flex flex-col items-center gap-1 group active:scale-90 transition-transform"
+        >
+          <MessageCircle className="w-7 h-7 text-white drop-shadow-md hover:scale-110 transition-transform" />
+          <span className="text-white text-xs font-bold drop-shadow-md">
+            {reel.comments
+              ? Object.values(reel.comments).filter((c: any) => !c.deleted)
+                  .length
+              : 0}
+          </span>
+        </button>
+
+        {/* Share Button */}
+        <button
+          onClick={handleShare}
+          className="flex flex-col items-center gap-1 group active:scale-90 transition-transform"
+        >
+          <Share2 className="w-7 h-7 text-white drop-shadow-md hover:scale-110 transition-transform" />
+          <span className="text-white text-xs font-bold drop-shadow-md">
+            शेयर
+          </span>
+        </button>
+
+        {/* Instagram Spinning Vinyl Disc */}
+        <button
+          onClick={onToggleAudio}
+          title={isAudioPlaying ? "म्यूट करें" : "संगीत चलाएं"}
+          className="relative w-10 h-10 mt-1 cursor-pointer group active:scale-90 transition-transform"
+        >
+          <div
+            className={`w-10 h-10 rounded-full bg-zinc-950 border-2 border-amber-400/80 flex items-center justify-center shadow-xl overflow-hidden ${isAudioPlaying && isActive ? "animate-[spin_4s_linear_infinite]" : ""}`}
+          >
+            <div className="w-4 h-4 rounded-full bg-gradient-to-tr from-amber-500 to-rose-500 border border-black flex items-center justify-center">
+              <Disc className="w-2.5 h-2.5 text-white" />
+            </div>
+          </div>
+          {isAudioPlaying && isActive && (
+            <span className="absolute -top-2 -right-1 text-[10px] animate-bounce">
+              🎵
+            </span>
+          )}
+        </button>
+      </div>
+
+      {/* Bottom Info Bar */}
+      <div className="absolute bottom-0 left-0 right-0 p-4 pb-6 bg-gradient-to-t from-black/95 via-black/60 to-transparent z-10 pointer-events-none">
+        <div className="flex items-center gap-2 mb-1.5">
+          <span className="text-white font-bold text-base drop-shadow-lg flex items-center gap-1.5">
+            {reel.authorName || "Admin"}
+            <span className="w-3.5 h-3.5 rounded-full bg-amber-400 text-black text-[9px] font-bold flex items-center justify-center inline-flex">
+              ✓
+            </span>
+          </span>
+          <span className="text-white/80 font-medium text-xs drop-shadow-lg">
+            @{reel.authorHandle || "nimboda_official"}
+          </span>
+        </div>
+
+        <p className="text-white text-xs w-[78%] drop-shadow-md line-clamp-3 mb-2.5 leading-relaxed whitespace-pre-line font-medium">
+          {reel.caption}
+        </p>
+
+        {/* Instagram Moving Music Ticker */}
+        <div
+          onClick={onToggleAudio}
+          className="pointer-events-auto flex items-center gap-2 text-white/95 text-xs font-semibold bg-black/60 border border-white/20 w-max max-w-[78%] px-3 py-1.5 rounded-full backdrop-blur-md cursor-pointer hover:bg-black/80 transition-colors shadow-lg"
+        >
+          <Music
+            className={`w-3.5 h-3.5 text-amber-300 shrink-0 ${isAudioPlaying && isActive ? "animate-[spin_3s_linear_infinite]" : ""}`}
+          />
+          <div className="overflow-hidden whitespace-nowrap text-ellipsis max-w-[190px]">
+            <span>
+              {songTitle} • {artistTitle}
+            </span>
+          </div>
+          {isAudioPlaying ? (
+            <Volume2 className="w-3 h-3 text-emerald-400 shrink-0 ml-1 animate-pulse" />
+          ) : (
+            <VolumeX className="w-3 h-3 text-rose-400 shrink-0 ml-1" />
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default function ReelsPage() {
+  const { user, isAdmin } = useAuth();
+  const [reels, setReels] = useState<any[]>(DEFAULT_VILLAGE_POSTS);
+  const [activeIndex, setActiveIndex] = useState(0);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  // Upload State
+  const [showUpload, setShowUpload] = useState(false);
+  const [uploadFile, setUploadFile] = useState<File | null>(null);
+  const [caption, setCaption] = useState("");
+  const [songName, setSongName] = useState("");
+  const [uploading, setUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
+
+  // Profile Handle State
+  const [userHandle, setUserHandle] = useState<string | null>(null);
+
+  // Comment Drawer State
+  const [activeCommentReel, setActiveCommentReel] = useState<any | null>(null);
+  const [commentText, setCommentText] = useState("");
+
+  // Audio Playback State
+  const [isAudioPlaying, setIsAudioPlaying] = useState(true);
+  const [needsInteraction, setNeedsInteraction] = useState(false);
+  const audioPlayerRef = useRef<HTMLAudioElement | null>(null);
+
+  // Sync activeCommentReel with latest reels data so comments appear instantly
+  useEffect(() => {
+    if (activeCommentReel) {
+      const updated = reels.find((r) => r.id === activeCommentReel.id);
+      if (updated) {
+        setActiveCommentReel(updated);
+      }
+    }
+  }, [reels]);
+
+  // Switch audio track when active reel changes
+  useEffect(() => {
+    if (!audioPlayerRef.current) {
+      audioPlayerRef.current = new Audio();
+      audioPlayerRef.current.loop = true;
+    }
+
+    const currentReel = reels[activeIndex];
+    if (!currentReel) return;
+    const targetAudio = currentReel.audioUrl;
+
+    if (targetAudio && audioPlayerRef.current.src !== targetAudio) {
+      audioPlayerRef.current.src = targetAudio;
+    }
+
+    if (isAudioPlaying && !document.hidden) {
+      audioPlayerRef.current
+        .play()
+        .then(() => setNeedsInteraction(false))
+        .catch(() => setNeedsInteraction(true));
+    } else {
+      audioPlayerRef.current.pause();
+    }
+  }, [activeIndex, reels, isAudioPlaying]);
+
+  // Audio Lifecycle: Auto-stop when exiting app or switching tabs
+  useEffect(() => {
+    const unlockAudio = () => {
+      if (audioPlayerRef.current && isAudioPlaying && !document.hidden) {
+        audioPlayerRef.current
+          .play()
+          .then(() => setNeedsInteraction(false))
+          .catch(() => setNeedsInteraction(true));
+      }
+    };
+
+    const handleVisibilityChange = () => {
+      if (document.hidden) {
+        if (audioPlayerRef.current) {
+          audioPlayerRef.current.pause();
+        }
+      } else {
+        if (isAudioPlaying && audioPlayerRef.current) {
+          audioPlayerRef.current
+            .play()
+            .then(() => setNeedsInteraction(false))
+            .catch(() => setNeedsInteraction(true));
+        }
+      }
+    };
+
+    const handleWindowBlur = () => {
+      if (audioPlayerRef.current) {
+        audioPlayerRef.current.pause();
+      }
+    };
+
+    const handleWindowFocus = () => {
+      if (isAudioPlaying && audioPlayerRef.current && !document.hidden) {
+        audioPlayerRef.current
+          .play()
+          .then(() => setNeedsInteraction(false))
+          .catch(() => setNeedsInteraction(true));
+      }
+    };
+
+    const handlePageHide = () => {
+      if (audioPlayerRef.current) {
+        audioPlayerRef.current.pause();
+        audioPlayerRef.current.src = "";
+      }
+    };
+
+    window.addEventListener("click", unlockAudio, { once: true });
+    window.addEventListener("touchstart", unlockAudio, { once: true });
+    window.addEventListener("scroll", unlockAudio, { once: true });
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    window.addEventListener("blur", handleWindowBlur);
+    window.addEventListener("focus", handleWindowFocus);
+    window.addEventListener("pagehide", handlePageHide);
+
+    return () => {
+      window.removeEventListener("click", unlockAudio);
+      window.removeEventListener("touchstart", unlockAudio);
+      window.removeEventListener("scroll", unlockAudio);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+      window.removeEventListener("blur", handleWindowBlur);
+      window.removeEventListener("focus", handleWindowFocus);
+      window.removeEventListener("pagehide", handlePageHide);
+
+      if (audioPlayerRef.current) {
+        audioPlayerRef.current.pause();
+        audioPlayerRef.current.src = "";
+      }
+    };
+  }, [isAudioPlaying]);
+
+  const toggleAudio = () => {
+    if (isAudioPlaying) {
+      if (audioPlayerRef.current) {
+        audioPlayerRef.current.pause();
+      }
+      setIsAudioPlaying(false);
+      showToast("🔇 संगीत म्यूट (OFF)");
+    } else {
+      setIsAudioPlaying(true);
+      if (audioPlayerRef.current) {
+        audioPlayerRef.current.play().catch(() => {});
+      }
+      showToast("🎵 संगीत चालू (ON)");
+    }
+  };
+
+  useEffect(() => {
+    if (
+      typeof window !== "undefined" &&
+      !localStorage.getItem("nimboda_guest_id")
+    ) {
+      localStorage.setItem(
+        "nimboda_guest_id",
+        "guest_" + Math.random().toString(36).substring(2, 9),
+      );
+    }
+
+    if (user) {
+      const handleRef = ref(db, `users/${user.uid}/handle`);
+      onValue(handleRef, (snap) => {
+        if (snap.exists()) {
+          setUserHandle(snap.val());
+        } else if (isAdmin) {
+          setUserHandle("admin");
+        }
+      });
+    }
+
+    // Fetch Reels from Firebase
+    const reelsRef = ref(db, "reels");
+    const unsub = onValue(reelsRef, (snap) => {
+      const data = snap.val();
+      if (data) {
+        const userUploadedReels = Object.entries(data)
+          .map(([id, val]: any) => ({ id, ...val }))
+          .sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+
+        const updatedDefaultPosts = DEFAULT_VILLAGE_POSTS.map((post) => {
+          if (data[post.id]) {
+            return {
+              ...post,
+              likes: { ...post.likes, ...data[post.id].likes },
+              comments: { ...post.comments, ...data[post.id].comments },
+            };
+          }
+          return post;
+        });
+
+        const customUploads = userUploadedReels.filter(
+          (r) =>
+            !r.id.startsWith("post_") &&
+            !r.id.startsWith("hero_post_") &&
+            !r.id.startsWith("village_post_") &&
+            !r.id.startsWith("default_post_"),
+        );
+        setReels([...customUploads, ...updatedDefaultPosts]);
+      } else {
+        setReels(DEFAULT_VILLAGE_POSTS);
+      }
+    });
+
+    return () => unsub();
+  }, [user, isAdmin]);
+
+  const handleScroll = () => {
+    if (containerRef.current) {
+      const { scrollTop, clientHeight } = containerRef.current;
+      const index = Math.round(scrollTop / clientHeight);
+      if (index !== activeIndex && index >= 0 && index < reels.length) {
+        setActiveIndex(index);
+      }
+    }
+  };
+
+  const handleUpload = async () => {
+    if (!user) return alert("Login required!");
+    if (!isAdmin) return alert("Only admins can upload posts.");
+    if (!uploadFile) return alert("Select a file!");
+
+    const isImage = uploadFile.type.startsWith("image/");
+    setUploading(true);
+
+    try {
+      const ext = isImage ? "jpg" : "mp4";
+      const fileName = `reels/${Date.now()}_${Math.random().toString(36).substring(2, 9)}.${ext}`;
+      const sRef = storageRef(storage, fileName);
+      const uploadTask = uploadBytesResumable(sRef, uploadFile);
+
+      uploadTask.on(
+        "state_changed",
+        (snapshot) => {
+          const progress =
+            (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
+          setUploadProgress(progress);
+        },
+        (error) => {
+          console.error(error);
+          alert("Upload failed. Try again.");
+          setUploading(false);
+        },
+        async () => {
+          const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
+          const newReelRef = push(ref(db, "reels"));
+
+          await set(newReelRef, {
+            authorId: user.uid,
+            authorName: user.displayName || user.name || "Admin",
+            authorHandle: userHandle || "admin",
+            authorPhoto: user.displayPhoto || "",
+            mediaUrl: downloadURL,
+            mediaType: isImage ? "image" : "video",
+            caption: caption.trim(),
+            songName: songName.trim() || "Apna Nimboda Original Audio",
+            artistName: "Nimboda Studio",
+            createdAt: serverTimestamp(),
+            likes: {},
+            comments: {},
+          });
+
+          setUploading(false);
+          setShowUpload(false);
+          setUploadFile(null);
+          setCaption("");
+          setSongName("");
+          setUploadProgress(0);
+          showToast(
+            isImage
+              ? "📸 फोटो सफलतापूर्वक पोस्ट हो गई!"
+              : "🎬 वीडियो रील सफलतापूर्वक पोस्ट हो गई!",
+          );
+        },
+      );
+    } catch (error) {
+      console.error(error);
+      setUploading(false);
+    }
+  };
+
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const showToast = (msg: string) => {
+    setToastMessage(msg);
+    setTimeout(() => setToastMessage(null), 3000);
+  };
+
+  const handleLike = async (reelId: string) => {
+    let uid = user?.uid;
+    if (!uid && typeof window !== "undefined") {
+      uid = localStorage.getItem("nimboda_guest_id") || "";
+    }
+    if (!uid) return;
+
+    const reel = reels.find((r) => r.id === reelId);
+    if (!reel) return;
+
+    const isLiked = reel.likes && reel.likes[uid];
+    const likeRef = ref(db, `reels/${reelId}/likes/${uid}`);
+
+    if (isLiked) {
+      await set(likeRef, null);
+    } else {
+      await set(likeRef, true);
+    }
+  };
+
+  const handlePostComment = async () => {
+    if (!commentText.trim() || !activeCommentReel) return;
+
+    const currentUid =
+      user?.uid ||
+      (typeof window !== "undefined"
+        ? localStorage.getItem("nimboda_guest_id")
+        : "guest_" + Date.now());
+    let commenterName = user?.displayName || user?.name;
+    if (!commenterName && typeof window !== "undefined") {
+      commenterName =
+        localStorage.getItem("nimboda_guest_name") || "निम्बोड़ा वासी";
+    }
+
+    const commentRef = ref(db, `reels/${activeCommentReel.id}/comments`);
+    await push(commentRef, {
+      userId: currentUid,
+      userName: commenterName || "निम्बोड़ा वासी",
+      userPhoto: user?.displayPhoto || "",
+      text: commentText.trim(),
+      timestamp: serverTimestamp(),
+    });
+
+    setCommentText("");
+  };
+
+  const handleDeleteComment = async (commentId: string, authorUid: string) => {
+    if (!activeCommentReel) return;
+    const currentUid =
+      user?.uid ||
+      (typeof window !== "undefined"
+        ? localStorage.getItem("nimboda_guest_id")
+        : "");
+
+    if (currentUid !== authorUid && !isAdmin) {
+      return alert("आप केवल अपना कमेंट हटा सकते हैं।");
+    }
+
+    if (window.confirm("क्या आप वाकई यह कमेंट हटाना चाहते हैं?")) {
+      const commentRef = ref(
+        db,
+        `reels/${activeCommentReel.id}/comments/${commentId}`,
+      );
+      if (isAdmin) {
+        await remove(commentRef);
+      } else {
+        await set(
+          ref(
+            db,
+            `reels/${activeCommentReel.id}/comments/${commentId}/deleted`,
+          ),
+          true,
+        );
+      }
+      showToast("कमेंट हटा दिया गया!");
+    }
+  };
+
+  const currentUid =
+    user?.uid ||
+    (typeof window !== "undefined"
+      ? localStorage.getItem("nimboda_guest_id")
+      : "");
+
+  return (
+    <div className="fixed inset-0 bg-black flex flex-col items-center justify-center overflow-hidden font-sans select-none">
+      {/* Top Floating Navigation Header */}
+      <div className="absolute top-0 left-0 right-0 z-30 flex items-center justify-between p-3.5 bg-gradient-to-b from-black/90 via-black/50 to-transparent pointer-events-none">
+        <Link
+          href="/dashboard"
+          className="pointer-events-auto w-9 h-9 rounded-full bg-black/70 backdrop-blur-md flex items-center justify-center text-white border border-white/20 hover:bg-black/90 transition-colors shadow-lg"
+        >
+          <ArrowLeft className="w-5 h-5" />
+        </Link>
+
+        <div className="flex items-center gap-2">
+          <h1 className="text-base font-black text-transparent bg-clip-text bg-gradient-to-r from-amber-400 via-rose-400 to-amber-200 drop-shadow-md flex items-center gap-1">
+            <Sparkles className="w-4 h-4 text-amber-400" /> APNA NIMBODA
+          </h1>
+        </div>
+
+        <div className="flex items-center gap-2 pointer-events-auto">
+          <button
+            onClick={toggleAudio}
+            title={isAudioPlaying ? "म्यूट करें" : "संगीत चालू करें"}
+            className={`flex items-center gap-1 px-2.5 py-1.5 rounded-full text-xs font-bold transition-all shadow-lg backdrop-blur-md border ${
+              isAudioPlaying
+                ? "bg-amber-500/90 border-amber-300 text-black animate-pulse"
+                : "bg-black/70 border-white/20 text-slate-300"
+            }`}
+          >
+            {isAudioPlaying ? (
+              <>
+                <Volume2 className="w-3.5 h-3.5 text-black" />
+                <span>ON</span>
+              </>
+            ) : (
+              <>
+                <VolumeX className="w-3.5 h-3.5 text-rose-400" />
+                <span>OFF</span>
+              </>
+            )}
+          </button>
+
+          {isAdmin && (
+            <button
+              onClick={async () => {
+                // Request native runtime permissions (Camera & Mic) like Instagram
+                try {
+                  if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+                    const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+                    stream.getTracks().forEach(track => track.stop());
+                  }
+                } catch(e) {}
+                setShowUpload(true);
+              }}
+              className="w-9 h-9 rounded-full bg-gradient-to-r from-amber-500 to-rose-600 flex items-center justify-center text-white shadow-lg hover:opacity-90 transition-opacity"
+            >
+              <Upload className="w-4 h-4" />
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* Main Reels Feed (Only 10 Village Posts) */}
+      <div
+        ref={containerRef}
+        onScroll={handleScroll}
+        className="w-full h-full flex-1 overflow-y-auto snap-y snap-mandatory scrollbar-hide no-scrollbar relative"
+        style={{ scrollBehavior: "smooth" }}
+      >
+        {reels.map((reel, index) => (
+          <Reel
+            key={reel.id}
+            reel={reel}
+            isActive={index === activeIndex}
+            onLike={handleLike}
+            currentUserId={currentUid}
+            onCommentClick={setActiveCommentReel}
+            isAudioPlaying={isAudioPlaying}
+            onToggleAudio={toggleAudio}
+          />
+        ))}
+      </div>
+
+      {/* Needs Interaction Overlay (Removed by user request) */}
+      <AnimatePresence>
+        {/* Intentionally left blank so no popup blocks the screen */}
+      </AnimatePresence>
+
+      {/* Floating Toast Notification */}
+      <AnimatePresence>
+        {toastMessage && (
+          <motion.div
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -20 }}
+            className="fixed top-20 left-1/2 -translate-x-1/2 z-[9999999] bg-black/95 border border-amber-400/50 text-white px-5 py-2 rounded-full shadow-2xl backdrop-blur-md text-xs font-bold flex items-center gap-2"
+          >
+            <span>{toastMessage}</span>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Comments Drawer */}
+      <AnimatePresence>
+        {activeCommentReel && (
+          <>
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setActiveCommentReel(null)}
+              className="fixed inset-0 bg-black/80 z-[999990] backdrop-blur-sm"
+            />
+            <motion.div
+              initial={{ y: "100%" }}
+              animate={{ y: 0 }}
+              exit={{ y: "100%" }}
+              transition={{ type: "spring", damping: 25, stiffness: 200 }}
+              className="fixed bottom-0 left-0 right-0 h-[68dvh] bg-zinc-900 rounded-t-3xl z-[999999] flex flex-col border-t border-white/10 shadow-[0_-10px_40px_rgba(0,0,0,0.8)] md:w-[420px] md:left-auto md:h-[100dvh] md:rounded-l-3xl md:rounded-tr-none md:border-l"
+            >
+              <div className="p-4 border-b border-white/10 flex items-center justify-between shrink-0">
+                <div>
+                  <h3 className="text-white font-bold text-lg">
+                    कमेंट्स (Comments)
+                  </h3>
+                  <p className="text-zinc-400 text-xs">
+                    आप अपने कमेंट्स को हटा सकते हैं
+                  </p>
+                </div>
+                <button
+                  onClick={() => setActiveCommentReel(null)}
+                  className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center text-white hover:bg-white/20 transition-colors"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <div className="flex-1 overflow-y-auto p-4 space-y-3 no-scrollbar">
+                {activeCommentReel.comments &&
+                Object.keys(activeCommentReel.comments).length > 0 ? (
+                  Object.entries(activeCommentReel.comments)
+                    .filter(([_, comment]: any) => isAdmin || !comment.deleted)
+                    .sort(
+                      (a: any, b: any) =>
+                        (a[1].timestamp || 0) - (b[1].timestamp || 0),
+                    )
+                    .map(([cId, comment]: any) => {
+                      const isMyComment =
+                        currentUid && comment.userId === currentUid;
+                      const canDelete = isMyComment || isAdmin;
+
+                      return (
+                        <div
+                          key={cId}
+                          className={`flex items-start justify-between gap-3 p-2.5 rounded-2xl transition-all ${
+                            comment.deleted
+                              ? "bg-rose-950/20 border border-rose-500/20 opacity-70"
+                              : "bg-white/5 border border-white/5"
+                          }`}
+                        >
+                          <div className="flex gap-3 flex-1 min-w-0">
+                            <div className="w-9 h-9 rounded-full overflow-hidden bg-slate-800 shrink-0 border border-white/10 flex items-center justify-center">
+                              {comment.userPhoto ? (
+                                <img
+                                  src={comment.userPhoto}
+                                  alt="User"
+                                  className="w-full h-full object-cover"
+                                />
+                              ) : (
+                                <User className="w-5 h-5 text-slate-400" />
+                              )}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <span className="text-white text-sm font-bold truncate">
+                                  {comment.userName || "निम्बोड़ा वासी"}
+                                </span>
+                                {comment.deleted && (
+                                  <span className="text-[10px] bg-rose-500/20 text-rose-300 px-2 py-0.5 rounded-full border border-rose-500/30">
+                                    हटाया गया
+                                  </span>
+                                )}
+                              </div>
+                              <p
+                                className={`text-sm mt-1 break-words ${comment.deleted ? "text-slate-500 line-through" : "text-slate-200"}`}
+                              >
+                                {comment.text}
+                              </p>
+                            </div>
+                          </div>
+
+                          {!comment.deleted && canDelete && (
+                            <button
+                              onClick={() =>
+                                handleDeleteComment(cId, comment.userId)
+                              }
+                              title="कमेंट हटाएं"
+                              className="p-1.5 rounded-lg text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 transition-colors shrink-0"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          )}
+                        </div>
+                      );
+                    })
+                ) : (
+                  <div className="flex flex-col items-center justify-center h-full text-zinc-500 py-12">
+                    <MessageCircle className="w-12 h-12 mb-2 opacity-30" />
+                    <p className="text-sm">पहला कमेंट करें!</p>
+                  </div>
+                )}
+              </div>
+
+              <div className="p-4 border-t border-white/10 bg-zinc-900 shrink-0">
+                <div className="flex items-center gap-2">
+                  <div className="w-8 h-8 rounded-full overflow-hidden bg-amber-950 shrink-0 border border-amber-500/30 flex items-center justify-center">
+                    {user?.displayPhoto ? (
+                      <img
+                        src={user.displayPhoto}
+                        alt="You"
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <User className="w-5 h-5 text-amber-400" />
+                    )}
+                  </div>
+                  <input
+                    type="text"
+                    value={commentText}
+                    onChange={(e) => setCommentText(e.target.value)}
+                    onKeyDown={(e) => e.key === "Enter" && handlePostComment()}
+                    placeholder="कमेंट लिखें (Add a comment)..."
+                    className="flex-1 bg-black/50 border border-white/10 rounded-full px-4 py-2 text-white text-sm focus:outline-none focus:border-amber-500"
+                  />
+                  <button
+                    onClick={handlePostComment}
+                    disabled={!commentText.trim()}
+                    className="w-9 h-9 rounded-full bg-gradient-to-r from-amber-500 to-rose-600 flex items-center justify-center text-white disabled:opacity-40 hover:opacity-90 transition-opacity"
+                  >
+                    <Send className="w-4 h-4 ml-0.5" />
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
+
+      {/* Upload Modal for Admin */}
+      <AnimatePresence>
+        {showUpload && isAdmin && (
+          <motion.div
+            initial={{ opacity: 0, y: 100 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 100 }}
+            className="absolute inset-0 z-[100] bg-black/90 backdrop-blur-lg flex flex-col items-center justify-center p-4"
+          >
+            <div className="w-full max-w-md bg-zinc-900 border border-white/10 rounded-3xl p-6 shadow-2xl relative">
+              <button
+                onClick={() => setShowUpload(false)}
+                className="absolute top-4 right-4 w-8 h-8 rounded-full bg-white/10 flex items-center justify-center text-white hover:bg-white/20"
+              >
+                <X className="w-5 h-5" />
+              </button>
+
+              <h2 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
+                📸 पोस्ट या 🎬 वीडियो रील अपलोड करें
+              </h2>
+
+              <div className="space-y-3">
+                <div>
+                  <label className="text-xs text-zinc-400 block mb-1">
+                    फोटो या वीडियो चुनें (JPG, PNG, MP4, WEBM)
+                  </label>
+                  <input
+                    type="file"
+                    accept="image/*,video/mp4,video/webm"
+                    onChange={(e) => setUploadFile(e.target.files?.[0] || null)}
+                    className="w-full text-white file:mr-3 file:py-1.5 file:px-3 file:rounded-full file:border-0 file:text-xs file:font-semibold file:bg-amber-500 file:text-black hover:file:bg-amber-400 bg-black/50 border border-white/10 rounded-xl p-2 text-xs"
+                  />
+                  {uploadFile && (
+                    <p className="text-[11px] text-amber-300 mt-1">
+                      चयनित प्रकार:{" "}
+                      {uploadFile.type.startsWith("image/")
+                        ? "🖼️ फोटो (Photo Reel)"
+                        : "🎬 वीडियो (Video Reel)"}
+                    </p>
+                  )}
+                </div>
+
+                <div>
+                  <label className="text-xs text-zinc-400 block mb-1">
+                    गाना / ऑडियो शीर्षक (Music Title)
+                  </label>
+                  <input
+                    type="text"
+                    value={songName}
+                    onChange={(e) => setSongName(e.target.value)}
+                    placeholder="उदा. Kesariya Balam / Marwadi Folk..."
+                    className="w-full bg-black/50 border border-white/10 rounded-xl p-2.5 text-white text-xs focus:outline-none focus:border-amber-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-xs text-zinc-400 block mb-1">
+                    कैप्शन / विवरण (Caption)
+                  </label>
+                  <textarea
+                    value={caption}
+                    onChange={(e) => setCaption(e.target.value)}
+                    placeholder="पोस्ट का विवरण व हैशटैग लिखें..."
+                    rows={3}
+                    className="w-full bg-black/50 border border-white/10 rounded-xl p-2.5 text-white text-xs focus:outline-none focus:border-amber-500 resize-none"
+                  />
+                </div>
+
+                <button
+                  onClick={handleUpload}
+                  disabled={uploading || !uploadFile}
+                  className="w-full py-3.5 rounded-xl bg-gradient-to-r from-amber-500 to-rose-600 hover:from-amber-400 hover:to-rose-500 text-white font-bold text-sm disabled:opacity-50 flex items-center justify-center gap-2 transition-all shadow-lg shadow-amber-500/20"
+                >
+                  {uploading ? (
+                    <>
+                      <Loader2 className="w-5 h-5 animate-spin" />
+                      {`अपलोडिंग ${Math.round(uploadProgress)}%`}
+                    </>
+                  ) : (
+                    "रील पोस्ट करें"
+                  )}
+                </button>
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      <style
+        dangerouslySetInnerHTML={{
+          __html: `
+        .no-scrollbar::-webkit-scrollbar {
+          display: none;
+        }
+        .no-scrollbar {
+          -ms-overflow-style: none;
+          scrollbar-width: none;
+        }
+      `,
+        }}
+      />
+    </div>
+  );
+}

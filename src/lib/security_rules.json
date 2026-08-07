@@ -1,0 +1,37 @@
+{
+  "rules": {
+    "admin_settings": {
+      ".read": "auth != null",
+      ".write": "auth != null && auth.uid === 'admin_config_master'",
+      "openai_key": {
+        ".read": "auth != null && auth.uid === 'admin_config_master'"
+      }
+    },
+    "approved_users": {
+      ".read": "auth != null",
+      ".write": "auth != null && auth.uid === 'admin_config_master'",
+      "$user_id": {
+        ".write": "auth != null && (auth.uid === 'admin_config_master' || auth.uid === $user_id)"
+      }
+    },
+    "banned_users": {
+      ".read": "auth != null",
+      ".write": "auth != null && auth.uid === 'admin_config_master'"
+    },
+    "pending_requests": {
+      ".read": "auth != null && auth.uid === 'admin_config_master'",
+      ".write": "auth != null"
+    },
+    "pending_edits": {
+      ".read": "auth != null && auth.uid === 'admin_config_master'",
+      ".write": "auth != null"
+    },
+    "chats": {
+      ".read": "auth != null && auth.uid === 'admin_config_master'",
+      "$chat_id": {
+        ".read": "auth != null && ($chat_id.contains(auth.uid) || auth.uid === 'admin_config_master')",
+        ".write": "auth != null && ($chat_id.contains(auth.uid) || auth.uid === 'admin_config_master')"
+      }
+    }
+  }
+}

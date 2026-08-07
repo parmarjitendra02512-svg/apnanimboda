@@ -1,0 +1,68 @@
+{
+  "rules": {
+    "admin_settings": {
+      ".read": true,
+      ".write": false
+    },
+    "approved_users": {
+      ".read": true,
+      ".write": false
+    },
+    "users": {
+      ".read": true,
+      ".write": false
+    },
+    "pending_requests": {
+      ".read": true,
+      ".write": false 
+    },
+    "chats": {
+      ".read": true,
+      ".write": true
+    },
+    "ai_chats_v2": {
+      ".read": true,
+      ".write": true
+    },
+    "reels": {
+      ".read": true,
+      ".write": true
+    },
+    "archived_users": {
+      ".read": "auth != null && auth.token.email == 'admin@apnanimboda.com'",
+      ".write": "auth != null && auth.token.email == 'admin@apnanimboda.com'"
+    },
+    "banned_users": {
+      ".read": true,
+      ".write": "auth != null && auth.token.email == 'admin@apnanimboda.com'"
+    },
+    "rejected_users": {
+      ".read": true,
+      ".write": "auth != null && auth.token.email == 'admin@apnanimboda.com'"
+    },
+    "posts": {
+      ".read": true,
+      ".write": true
+    },
+    "support_chats": {
+      ".read": true,
+      ".write": true
+    },
+    "notifications": {
+      ".read": true,
+      ".write": true
+    },
+    "system_logs": {
+      ".read": true,
+      ".write": true
+    },
+    "search_logs": {
+      ".read": true,
+      ".write": true
+    },
+    "click_logs": {
+      ".read": true,
+      ".write": true
+    }
+  }
+}

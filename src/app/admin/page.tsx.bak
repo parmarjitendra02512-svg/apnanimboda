@@ -1,0 +1,1701 @@
+"use client";
+
+import { motion } from "framer-motion";
+import {
+  Shield,
+  Check,
+  X,
+  Users,
+  Edit2,
+  Loader2,
+  Save,
+  MessageSquare,
+  Monitor,
+  Image as ImageIcon,
+  Activity,
+  Bot,
+  Video,
+  Search,
+  AlertTriangle,
+  ShieldCheck,
+} from "lucide-react";
+import { useState, useEffect } from "react";
+import Link from "next/link";
+import AdminHeader from "@/components/admin/AdminHeader";
+import DirectoryTab from "@/components/admin/DirectoryTab";
+import SettingsTab from "@/components/admin/SettingsTab";
+import MonitorTab from "@/components/admin/MonitorTab";
+import ComplianceTab from "@/components/admin/ComplianceTab";
+import { db } from "@/lib/firebase";
+import { ref, onValue, set, remove, update } from "firebase/database";
+import { useAuth } from "@/context/AuthContext";
+import { useRouter } from "next/navigation";
+
+export default function AdminDashboard() {
+  const [activeTab, setActiveTab] = useState("directory"); // directory, monitor, settings
+  const [requests, setRequests] = useState<any[]>([]);
+  const [approvedUsers, setApprovedUsers] = useState<any[]>([]);
+  const [bannedUsers, setBannedUsers] = useState<any[]>([]);
+  const [chats, setChats] = useState<any[]>([]);
+  const [aiChats, setAiChats] = useState<any[]>([]);
+  const [banModalUser, setBanModalUser] = useState<any>(null);
+  const [banDuration, setBanDuration] = useState("permanent");
+  const [pendingEdits, setPendingEdits] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [editingUser, setEditingUser] = useState<any>(null);
+  const [categoriesControl, setCategoriesControl] = useState<any>({});
+  const [archivedUsers, setArchivedUsers] = useState<any[]>([]);
+  const [supportChats, setSupportChats] = useState<any[]>([]);
+  const [searchLogs, setSearchLogs] = useState<any[]>([]);
+  const [clickLogs, setClickLogs] = useState<any[]>([]);
+  const [systemLogs, setSystemLogs] = useState<any[]>([]);
+  const [pageViews, setPageViews] = useState(0);
+  const [appInstalls, setAppInstalls] = useState(0);
+
+  // Settings State
+  const [openAiKey, setOpenAiKey] = useState("");
+  const [savingKey, setSavingKey] = useState(false);
+  const [newsApiKey, setNewsApiKey] = useState("");
+  const [savingNewsKey, setSavingNewsKey] = useState(false);
+  const [weatherApiKey, setWeatherApiKey] = useState("");
+  const [savingWeatherKey, setSavingWeatherKey] = useState(false);
+  const [youtubeApiKey, setYoutubeApiKey] = useState("");
+  const [savingYoutubeKey, setSavingYoutubeKey] = useState(false);
+  const [digilockerApiKey, setDigilockerApiKey] = useState("");
+  const [digilockerClientId, setDigilockerClientId] = useState("");
+  const [digilockerApiUrl, setDigilockerApiUrl] = useState("");
+  const [savingDigilocker, setSavingDigilocker] = useState(false);
+  const [globalPrivacy, setGlobalPrivacy] = useState(false);
+  const [features, setFeatures] = useState<Record<string, string>>({
+    news: "active",
+    weather: "active",
+    reels: "active",
+    edocs: "active",
+    pincode: "active",
+    emitra: "active",
+    quiz: "active",
+    youtube: "active",
+    calling: "active",
+  });
+  const [savingFeatures, setSavingFeatures] = useState(false);
+  const [adType, setAdType] = useState("image");
+  const [adTitle, setAdTitle] = useState("");
+  const [adDesc, setAdDesc] = useState("");
+  const [adImageUrl, setAdImageUrl] = useState("");
+  const [adLink, setAdLink] = useState("");
+  const [savingAd, setSavingAd] = useState(false);
+  const [youtubeEmbed, setYoutubeEmbed] = useState("");
+  const [savingYoutube, setSavingYoutube] = useState(false);
+
+  // User Management State
+  const [userSearchTerm, setUserSearchTerm] = useState("");
+  const [userCurrentPage, setUserCurrentPage] = useState(1);
+  const itemsPerPage = 50;
+
+  // Kundli Search State
+  const [kundliSearchQuery, setKundliSearchQuery] = useState("");
+  const [kundliResult, setKundliResult] = useState<any>(null);
+
+  const { user, isAdmin, logout, loading: authLoading } = useAuth();
+  const router = useRouter();
+
+  useEffect(() => {
+    if (!authLoading && !user) window.location.href = "/";
+    if (!authLoading && user && !isAdmin) router.push("/dashboard");
+  }, [user, isAdmin, authLoading, router]);
+
+  useEffect(() => {
+    if (!isAdmin) return;
+
+    const requestsRef = ref(db, "pending_requests");
+    const approvedRef = ref(db, "approved_users");
+    const editsRef = ref(db, "pending_edits");
+    const bannedRef = ref(db, "banned_users");
+    const settingsRef = ref(db, "admin_settings");
+    const chatsRef = ref(db, "chats");
+    const catRef = ref(db, "admin_settings/categories");
+    const searchLogsRef = ref(db, "search_logs");
+    const clickLogsRef = ref(db, "click_logs");
+    const archivedRef = ref(db, "archived_users");
+    const supportChatsRef = ref(db, "support_chats");
+    const systemLogsRef = ref(db, "system_logs");
+
+    const unsubscribeReq = onValue(requestsRef, (snapshot) => {
+      const data = snapshot.val();
+      setRequests(
+        data ? Object.keys(data).map((key) => ({ id: key, ...data[key] })) : [],
+      );
+    });
+
+    const unsubscribeAppr = onValue(approvedRef, (snapshot) => {
+      const data = snapshot.val();
+      setApprovedUsers(
+        data ? Object.keys(data).map((key) => ({ id: key, ...data[key] })) : [],
+      );
+      setLoading(false);
+    });
+
+    const unsubscribeEdits = onValue(editsRef, (snapshot) => {
+      const data = snapshot.val();
+      setPendingEdits(
+        data ? Object.keys(data).map((key) => ({ id: key, ...data[key] })) : [],
+      );
+    });
+
+    const unsubscribeBanned = onValue(bannedRef, (snapshot) => {
+      const data = snapshot.val();
+      setBannedUsers(
+        data
+          ? Object.keys(data).map((key) => ({ mobile: key, ...data[key] }))
+          : [],
+      );
+    });
+
+    const unsubscribeSettings = onValue(settingsRef, (snapshot) => {
+      const data = snapshot.val();
+      if (data) {
+        if (data.openai_key) setOpenAiKey(data.openai_key);
+        if (data.news_api_key) setNewsApiKey(data.news_api_key);
+        if (data.weather_api_key) setWeatherApiKey(data.weather_api_key);
+        if (data.api_keys?.youtube) setYoutubeApiKey(data.api_keys.youtube);
+        if (data.digilocker_api_key)
+          setDigilockerApiKey(data.digilocker_api_key);
+        if (data.digilocker_client_id)
+          setDigilockerClientId(data.digilocker_client_id);
+        if (data.digilocker_api_url)
+          setDigilockerApiUrl(data.digilocker_api_url);
+        if (data.global_privacy !== undefined)
+          setGlobalPrivacy(data.global_privacy);
+        if (data.features) {
+          const normalizeState = (val: any) => {
+            if (val === true) return "active";
+            if (val === false) return "hidden";
+            return val || "active";
+          };
+          setFeatures({
+            news: normalizeState(data.features.news),
+            weather: normalizeState(data.features.weather),
+            reels: normalizeState(data.features.reels),
+            edocs: normalizeState(data.features.edocs),
+            pincode: normalizeState(data.features.pincode),
+            emitra: normalizeState(data.features.emitra),
+            quiz: normalizeState(data.features.quiz),
+            youtube: normalizeState(data.features.youtube),
+          });
+        }
+        if (data.hero_ad) {
+          setAdType(data.hero_ad.type || "image");
+          setAdTitle(data.hero_ad.title || "");
+          setAdDesc(data.hero_ad.description || "");
+          setAdImageUrl(data.hero_ad.imageUrl || "");
+          setAdLink(data.hero_ad.link || "");
+        }
+        if (data.youtube_embed_raw !== undefined) {
+          setYoutubeEmbed(data.youtube_embed_raw);
+        } else if (data.youtube_embed !== undefined) {
+          setYoutubeEmbed(data.youtube_embed);
+        }
+      }
+    });
+
+    const unsubscribeChats = onValue(chatsRef, (snapshot) => {
+      const data = snapshot.val();
+      setChats(
+        data
+          ? Object.entries(data).map(([id, val]) => ({ id, ...(val as any) }))
+          : [],
+      );
+    });
+
+    const aiChatsRef = ref(db, "ai_chats_v2");
+    
+    // ...
+
+    const unsubscribeAiChats = onValue(aiChatsRef, (snapshot) => {
+      const data = snapshot.val();
+      if (data) {
+        const formattedChats: any[] = [];
+        Object.entries(data).forEach(([userId, userChats]: any) => {
+          Object.entries(userChats).forEach(([chatId, chatData]: any) => {
+            formattedChats.push({
+              id: `${userId}_${chatId}`,
+              userId,
+              mobile: userId,
+              ...(chatData as any),
+            });
+          });
+        });
+        setAiChats(formattedChats.sort((a, b) => b.lastUpdated - a.lastUpdated));
+      } else {
+        setAiChats([]);
+      }
+    });
+
+    const unsubscribeCat = onValue(catRef, (snapshot) => {
+      setCategoriesControl(snapshot.val() || {});
+    });
+
+    const unsubscribeSearchLogs = onValue(searchLogsRef, (snapshot) => {
+      const data = snapshot.val();
+      setSearchLogs(
+        data
+          ? Object.values(data).sort(
+              (a: any, b: any) => b.timestamp - a.timestamp,
+            )
+          : [],
+      );
+    });
+
+    const unsubscribeClickLogs = onValue(clickLogsRef, (snapshot) => {
+      const data = snapshot.val();
+      setClickLogs(
+        data
+          ? Object.values(data).sort(
+              (a: any, b: any) => b.timestamp - a.timestamp,
+            )
+          : [],
+      );
+    });
+
+    const unsubscribeArchived = onValue(archivedRef, (snapshot) => {
+      const data = snapshot.val();
+      setArchivedUsers(
+        data ? Object.keys(data).map((key) => ({ id: key, ...data[key] })) : [],
+      );
+    });
+
+    const analyticsRef = ref(db, "analytics");
+    const unsubscribeAnalytics = onValue(analyticsRef, (snapshot) => {
+      const data = snapshot.val();
+      if (data) {
+        setPageViews(data.pageViews || 0);
+        setAppInstalls(data.appInstalls || 0);
+      }
+    });
+
+    const unsubscribeSupport = onValue(supportChatsRef, (snapshot) => {
+      const data = snapshot.val();
+      setSupportChats(
+        data ? Object.keys(data).map((key) => ({ id: key, ...data[key] })) : [],
+      );
+    });
+
+    const unsubscribeSystemLogs = onValue(systemLogsRef, (snapshot) => {
+      const data = snapshot.val();
+      setSystemLogs(
+        data
+          ? Object.entries(data)
+              .map(([id, val]) => ({ id, ...(val as any) }))
+              .sort((a: any, b: any) => b.timestamp - a.timestamp)
+          : [],
+      );
+    });
+
+    return () => {
+      unsubscribeReq();
+      unsubscribeAppr();
+      unsubscribeEdits();
+      unsubscribeBanned();
+      unsubscribeSettings();
+      unsubscribeChats();
+      unsubscribeAiChats();
+      unsubscribeCat();
+      unsubscribeSearchLogs();
+      unsubscribeClickLogs();
+      unsubscribeArchived();
+      unsubscribeSupport();
+      unsubscribeSystemLogs();
+    };
+  }, [user, isAdmin, router, authLoading]);
+
+  const handleLogout = async () => {
+    if (logout) {
+      await logout();
+      window.location.href = "/";
+    }
+  };
+
+  const handleSaveApiKey = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSavingKey(true);
+    try {
+      await set(ref(db, "admin_settings/openai_key"), openAiKey);
+      alert("API Key saved successfully!");
+    } catch (err) {
+      console.error(err);
+      alert("Failed to save API Key");
+    } finally {
+      setSavingKey(false);
+    }
+  };
+
+  const handleSaveNewsApiKey = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSavingNewsKey(true);
+    try {
+      await set(ref(db, "admin_settings/news_api_key"), newsApiKey);
+      alert("News API Key saved successfully!");
+    } catch (err) {
+      console.error(err);
+      alert("Failed to save News API Key");
+    } finally {
+      setSavingNewsKey(false);
+    }
+  };
+
+  const handleSaveWeatherApiKey = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSavingWeatherKey(true);
+    try {
+      await set(ref(db, "admin_settings/weather_api_key"), weatherApiKey);
+      alert("Weather API Key saved successfully!");
+    } catch (err) {
+      console.error(err);
+      alert("Failed to save Weather API Key");
+    } finally {
+      setSavingWeatherKey(false);
+    }
+  };
+
+  const handleSaveYoutubeApiKey = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSavingYoutubeKey(true);
+    try {
+      await set(ref(db, "admin_settings/api_keys/youtube"), youtubeApiKey);
+      alert("YouTube API Key saved successfully!");
+    } catch (err) {
+      console.error(err);
+      alert("Failed to save YouTube API Key");
+    } finally {
+      setSavingYoutubeKey(false);
+    }
+  };
+
+  const handleSaveDigilockerSettings = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSavingDigilocker(true);
+    try {
+      await set(ref(db, "admin_settings/digilocker_api_key"), digilockerApiKey);
+      await set(
+        ref(db, "admin_settings/digilocker_client_id"),
+        digilockerClientId,
+      );
+      await set(ref(db, "admin_settings/digilocker_api_url"), digilockerApiUrl);
+      alert("e-Documents Settings saved successfully!");
+    } catch (err) {
+      console.error(err);
+      alert("Failed to save e-Documents Settings");
+    } finally {
+      setSavingDigilocker(false);
+    }
+  };
+
+  const handleToggleGlobalPrivacy = async () => {
+    try {
+      await set(ref(db, "admin_settings/global_privacy"), !globalPrivacy);
+      setGlobalPrivacy(!globalPrivacy);
+    } catch (err) {
+      console.error(err);
+      alert("Failed to update privacy settings");
+    }
+  };
+
+  const handleChangeFeatureState = async (
+    featureKey: string,
+    newState: string,
+  ) => {
+    try {
+      await set(ref(db, `admin_settings/features/${featureKey}`), newState);
+      setFeatures((prev) => ({ ...prev, [featureKey]: newState }));
+    } catch (err) {
+      console.error(err);
+      alert(`Failed to update ${featureKey}`);
+    }
+  };
+
+  const handleBackup = async () => {
+    try {
+      const res = await fetch("/api/admin/backup");
+      if (!res.ok) throw new Error("Backup failed");
+
+      const blob = await res.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `nimboda_backup_${new Date().toISOString().split("T")[0]}.json`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      a.remove();
+    } catch (err: any) {
+      alert(err.message || "Error downloading backup");
+    }
+  };
+
+  const handleSaveAd = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSavingAd(true);
+    try {
+      await set(ref(db, "admin_settings/hero_ad"), {
+        type: adType,
+        title: adTitle,
+        description: adDesc,
+        imageUrl: adImageUrl,
+        link: adLink,
+      });
+      alert("Ad Banner saved successfully!");
+    } catch (err) {
+      console.error(err);
+      alert("Failed to save Ad Banner");
+    } finally {
+      setSavingAd(false);
+    }
+  };
+
+  const handleSaveYoutube = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSavingYoutube(true);
+    try {
+      const regex =
+        /(?:youtu\.be\/|youtube\.com\/(?:embed\/|v\/|watch\?v=|watch\?.+&v=))([^"&?\/\s]{11})/g;
+      const videoIds = [];
+      let match;
+      while ((match = regex.exec(youtubeEmbed)) !== null) {
+        videoIds.push(match[1]);
+      }
+
+      // Limit to 10
+      const finalIds = videoIds.slice(0, 10);
+
+      await set(ref(db, "admin_settings/youtube_embeds"), finalIds);
+      await set(ref(db, "admin_settings/youtube_embed_raw"), youtubeEmbed);
+      await set(ref(db, "admin_settings/youtube_embed"), null); // Delete legacy key so dashboard doesn't fall back to it
+
+      alert(`Saved ${finalIds.length} YouTube videos successfully!`);
+    } catch (err) {
+      console.error(err);
+      alert("Failed to save YouTube Embeds");
+    } finally {
+      setSavingYoutube(false);
+    }
+  };
+
+  const handleApprove = async (req: any) => {
+    try {
+      await set(ref(db, `approved_users/${req.id}`), {
+        ...req,
+        status: "approved",
+        approvedAt: Date.now(),
+      });
+      await remove(ref(db, `pending_requests/${req.id}`));
+
+      const chatId = ["admin_config_master", req.id].sort().join("_");
+      await set(ref(db, `chats/${chatId}/messages/${Date.now()}`), {
+        text: "Welcome to Apna Nimboda! Your account has been approved by the Administrator. If you need any help, you can reply here.",
+        senderId: "admin_config_master",
+        timestamp: Date.now(),
+      });
+    } catch (error) {
+      console.error("Failed to approve", error);
+      alert("Approve Failed: " + error);
+    }
+  };
+
+  const handleReject = async (req: any) => {
+    const reason = window.prompt(
+      "Are you sure you want to reject this request? Provide a reason (user will see this):",
+    );
+    if (reason !== null) {
+      try {
+        await set(ref(db, `rejected_users/${req.mobile}`), {
+          reason: reason || "Violation of terms",
+          timestamp: Date.now(),
+        });
+        await remove(ref(db, `pending_requests/${req.id}`));
+      } catch (error) {
+        console.error("Failed to reject", error);
+        alert("Reject Failed: " + error);
+      }
+    }
+  };
+
+  const handleApproveEdit = async (edit: any) => {
+    try {
+      const { id, status, timestamp, ...changes } = edit;
+      await update(ref(db, `approved_users/${id}`), changes);
+      await remove(ref(db, `pending_edits/${id}`));
+      await set(ref(db, `notifications/${id}/${Date.now()}`), {
+        title: "Profile Approved",
+        message:
+          "Your profile edits have been approved and published by the Admin.",
+        timestamp: Date.now(),
+      });
+    } catch (error) {
+      console.error("Failed to approve edit", error);
+    }
+  };
+
+  const handleRejectEdit = async (editId: string) => {
+    if (window.confirm("Reject these profile changes?")) {
+      await remove(ref(db, `pending_edits/${editId}`));
+    }
+  };
+
+  const handleDeleteUser = async (u: any) => {
+    const reason = window.prompt(
+      `Are you sure you want to permanently delete ${u.name}? Provide a reason (they will see this):`,
+    );
+    if (reason !== null) {
+      // Archive User Data instead of permanent loss
+      await set(ref(db, `archived_users/${u.id}`), {
+        ...u,
+        deletedAt: Date.now(),
+        deleteReason: reason || "Violation of platform rules",
+      });
+      await set(ref(db, `rejected_users/${u.mobile}`), {
+        reason: reason || "Violation of platform rules",
+        timestamp: Date.now(),
+      });
+      await remove(ref(db, `approved_users/${u.id}`));
+    }
+  };
+
+  const handleBanSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!banModalUser) return;
+    try {
+      let bannedUntil = null;
+      if (banDuration !== "permanent") {
+        const days = parseInt(banDuration);
+        bannedUntil = Date.now() + days * 24 * 60 * 60 * 1000;
+      }
+      await set(ref(db, `banned_users/${banModalUser.mobile}`), {
+        name: banModalUser.name,
+        bannedAt: Date.now(),
+        bannedUntil,
+      });
+      setBanModalUser(null);
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const handleUnban = async (mobile: string) => {
+    await set(ref(db, `banned_users/${mobile}`), null);
+  };
+
+  const handleDirectEditSave = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      const { id, ...changes } = editingUser;
+      await update(ref(db, `approved_users/${id}`), changes);
+      await set(ref(db, `notifications/${id}/${Date.now()}`), {
+        title: "Profile Updated",
+        message: "Your profile details were updated by the Administrator.",
+        timestamp: Date.now(),
+      });
+      setEditingUser(null);
+    } catch (error) {
+      console.error("Failed to save edit", error);
+    }
+  };
+
+  const handleUpdateCategoryState = async (
+    categoryId: string,
+    newState: string,
+  ) => {
+    try {
+      await update(ref(db, `admin_settings/categories/${categoryId}`), {
+        state: newState,
+      });
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const handleUpdateCategoryMessage = async (
+    categoryId: string,
+    message: string,
+  ) => {
+    try {
+      await update(ref(db, `admin_settings/categories/${categoryId}`), {
+        lockMessage: message,
+      });
+      alert("Message updated successfully!");
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const coreCategories = [
+    { id: "doctor", label: "Doctors & Medical" },
+    { id: "teacher", label: "Teachers & Education" },
+    { id: "business", label: "Shops & Businesses" },
+    { id: "services", label: "Gram Panchayat" },
+    { id: "student", label: "Students" },
+  ];
+
+  const [broadcastText, setBroadcastText] = useState("");
+  const [broadcastPhotoUrl, setBroadcastPhotoUrl] = useState("");
+  const [showBroadcastModal, setShowBroadcastModal] = useState(false);
+  const [broadcastLoading, setBroadcastLoading] = useState(false);
+
+  const handleBroadcastSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!broadcastText && !broadcastPhotoUrl) return;
+    setBroadcastLoading(true);
+    try {
+      for (const u of approvedUsers) {
+        const chatId = ["admin_config_master", u.id].sort().join("_");
+        const newMessageRef = ref(db, `chats/${chatId}/messages/${Date.now()}`);
+        await set(newMessageRef, {
+          text: broadcastText,
+          photoUrl: broadcastPhotoUrl,
+          senderId: "admin_config_master",
+          timestamp: Date.now(),
+        });
+      }
+      setBroadcastText("");
+      setBroadcastPhotoUrl("");
+      setShowBroadcastModal(false);
+      alert("Broadcast sent successfully to all users!");
+    } catch (err) {
+      console.error(err);
+      alert("Failed to send broadcast");
+    } finally {
+      setBroadcastLoading(false);
+    }
+  };
+
+  const handleAdminDeleteMessage = async (chatId: string, msgKey: string) => {
+    if (
+      confirm(
+        "Delete this message? It will be hidden from users but kept in logs for you.",
+      )
+    ) {
+      await update(ref(db, `chats/${chatId}/messages/${msgKey}`), {
+        isDeleted: true,
+        deletedByAdmin: true,
+      });
+    }
+  };
+
+  const handleBroadcastPhotoUpload = (
+    e: React.ChangeEvent<HTMLInputElement>,
+  ) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setBroadcastPhotoUrl(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  // Helper for Monitor tab
+  const getUsernameById = (id: string) => {
+    if (id === "admin_config_master") return "Admin (You)";
+    const user = approvedUsers.find((u) => u.id === id);
+    return user ? user.name : "Unknown User";
+  };
+
+  if (authLoading || loading)
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <Loader2 className="w-8 h-8 text-blue-500 animate-spin" />
+      </div>
+    );
+  if (!isAdmin) return null;
+
+  return (
+    <div className="min-h-screen flex flex-col p-4 md:p-8">
+      <AdminHeader
+        activeTab={activeTab}
+        setActiveTab={setActiveTab}
+        setShowBroadcastModal={setShowBroadcastModal}
+        handleLogout={handleLogout}
+        pageViews={pageViews}
+        appInstalls={appInstalls}
+      />
+
+      <main className="w-full max-w-6xl mx-auto flex-1 z-10">
+        {/* DIRECTORY TAB */}
+        {activeTab === "directory" && (
+          <DirectoryTab
+            requests={requests}
+            handleApprove={handleApprove}
+            handleReject={handleReject}
+            pendingEdits={pendingEdits}
+            handleApproveEdit={handleApproveEdit}
+            handleRejectEdit={handleRejectEdit}
+            approvedUsers={approvedUsers}
+            userSearchTerm={userSearchTerm}
+            setUserSearchTerm={setUserSearchTerm}
+            userCurrentPage={userCurrentPage}
+            setUserCurrentPage={setUserCurrentPage}
+            itemsPerPage={itemsPerPage}
+            setEditingUser={setEditingUser}
+            setBanModalUser={setBanModalUser}
+            handleDeleteUser={handleDeleteUser}
+          />
+        )}
+
+        {/* KUNDLI TAB */}
+        {activeTab === "kundli" && (
+          <div className="grid gap-6">
+            <div className="glass-panel p-6 rounded-2xl border border-indigo-500/20 bg-gradient-to-r from-indigo-500/10 to-transparent">
+              <h2 className="text-xl font-bold text-indigo-400 mb-2 flex items-center gap-2">
+                <Search className="w-5 h-5" /> User Kundli Search
+              </h2>
+              <p className="text-sm text-slate-400 mb-6">
+                Enter a 10-digit mobile number to pull a complete history and
+                profile of a user (including GPS and Activity).
+              </p>
+
+              <div className="flex gap-3 max-w-md">
+                <input
+                  type="tel"
+                  value={kundliSearchQuery}
+                  onChange={(e) => setKundliSearchQuery(e.target.value)}
+                  className="flex-1 bg-white/5 border border-white/10 rounded-xl py-3 px-4 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/50"
+                  placeholder="Enter Mobile Number..."
+                  maxLength={10}
+                />
+                <button
+                  onClick={() => {
+                    const allUsers = [
+                      ...approvedUsers,
+                      ...bannedUsers,
+                      ...archivedUsers,
+                    ];
+                    const found = allUsers.find(
+                      (u) =>
+                        u.mobile === kundliSearchQuery ||
+                        u.mobile === `+91${kundliSearchQuery}`,
+                    );
+                    setKundliResult(found || "not_found");
+                  }}
+                  className="px-6 py-3 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-medium transition-colors"
+                >
+                  Search
+                </button>
+              </div>
+            </div>
+
+            {kundliResult === "not_found" && (
+              <div className="glass-card p-12 text-center rounded-2xl border-dashed border border-white/20 text-slate-400">
+                <AlertTriangle className="w-12 h-12 text-slate-500 mx-auto mb-3" />
+                <p>
+                  No user found with this mobile number across any database.
+                </p>
+              </div>
+            )}
+
+            {kundliResult && kundliResult !== "not_found" && (
+              <div className="glass-panel p-8 rounded-2xl border border-white/10 relative overflow-hidden">
+                <div className="absolute top-0 right-0 p-4">
+                  <span
+                    className={`px-3 py-1 rounded-full text-xs font-bold ${approvedUsers.find((u) => u.id === kundliResult.id) ? "bg-emerald-500/20 text-emerald-400" : bannedUsers.find((u) => u.id === kundliResult.id) ? "bg-red-500/20 text-red-400" : "bg-amber-500/20 text-amber-400"}`}
+                  >
+                    {approvedUsers.find((u) => u.id === kundliResult.id)
+                      ? "APPROVED"
+                      : bannedUsers.find((u) => u.id === kundliResult.id)
+                        ? "BANNED"
+                        : "ARCHIVED"}
+                  </span>
+                </div>
+
+                <div className="flex items-start gap-6">
+                  <div className="w-24 h-24 rounded-2xl bg-white/10 overflow-hidden shrink-0 border-2 border-white/20">
+                    {kundliResult.photoUrl ? (
+                      <img
+                        src={kundliResult.photoUrl}
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <Users className="w-12 h-12 text-slate-400 m-6" />
+                    )}
+                  </div>
+                  <div>
+                    <h2 className="text-3xl font-bold text-white mb-1">
+                      {kundliResult.name}
+                    </h2>
+                    <p className="text-slate-400">
+                      Son of {kundliResult.father}
+                    </p>
+                    <div className="flex gap-4 mt-4">
+                      <div className="bg-white/5 p-3 rounded-lg border border-white/10">
+                        <p className="text-xs text-slate-500">Mobile</p>
+                        <p className="text-white font-medium">
+                          {kundliResult.mobile}
+                        </p>
+                      </div>
+                      <div className="bg-white/5 p-3 rounded-lg border border-white/10">
+                        <p className="text-xs text-slate-500">Password</p>
+                        <p className="text-blue-400 font-mono">
+                          {kundliResult.password || "N/A"}
+                        </p>
+                      </div>
+                      <div className="bg-white/5 p-3 rounded-lg border border-white/10">
+                        <p className="text-xs text-slate-500">Last Login</p>
+                        <p className="text-emerald-400 font-medium">
+                          {kundliResult.lastLogin
+                            ? new Date(kundliResult.lastLogin).toLocaleString()
+                            : "Never"}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="mt-8 grid grid-cols-2 gap-4">
+                  <div className="glass-card p-4 rounded-xl border border-white/5">
+                    <h3 className="text-sm font-bold text-slate-300 mb-2 border-b border-white/10 pb-2">
+                      Location & Profession
+                    </h3>
+                    <p className="text-sm text-slate-400">
+                      <strong className="text-white">Profession:</strong>{" "}
+                      {kundliResult.profession || "N/A"}
+                    </p>
+                    <p className="text-sm text-slate-400 mt-1">
+                      <strong className="text-white">Location/Ward:</strong>{" "}
+                      {kundliResult.location || "N/A"}
+                    </p>
+                    <p className="text-sm text-slate-400 mt-1">
+                      <strong className="text-white">Panchayat:</strong>{" "}
+                      {kundliResult.gram_panchayat || "N/A"} -{" "}
+                      {kundliResult.pincode}
+                    </p>
+                    <p className="text-sm text-slate-400 mt-1">
+                      <strong className="text-white">Privacy Mode:</strong>{" "}
+                      {kundliResult.is_private ? "Enabled" : "Disabled"}
+                    </p>
+                  </div>
+
+                  <div className="glass-card p-4 rounded-xl border border-emerald-500/20 bg-emerald-500/5">
+                    <h3 className="text-sm font-bold text-emerald-400 mb-2 border-b border-emerald-500/10 pb-2">
+                      GPS Tracking
+                    </h3>
+                    {kundliResult.location &&
+                    typeof kundliResult.location === "object" &&
+                    kundliResult.location.lat ? (
+                      <>
+                        <p className="text-sm text-slate-300">
+                          <strong className="text-white">Latitude:</strong>{" "}
+                          {kundliResult.location.lat}
+                        </p>
+                        <p className="text-sm text-slate-300 mt-1">
+                          <strong className="text-white">Longitude:</strong>{" "}
+                          {kundliResult.location.lng}
+                        </p>
+                        <p className="text-sm text-slate-300 mt-1">
+                          <strong className="text-white">Last Sync:</strong>{" "}
+                          {kundliResult.location.updatedAt
+                            ? new Date(
+                                kundliResult.location.updatedAt,
+                              ).toLocaleString()
+                            : "N/A"}
+                        </p>
+                        <a
+                          href={`https://www.google.com/maps/search/?api=1&query=${kundliResult.location.lat},${kundliResult.location.lng}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="mt-3 block w-full text-center py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-sm font-medium transition-colors"
+                        >
+                          Open in Maps
+                        </a>
+                      </>
+                    ) : (
+                      <p className="text-sm text-slate-500 italic">
+                        No real-time GPS data available for this user.
+                      </p>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* LOCATION TAB */}
+        {activeTab === "location" && (
+          <div className="grid gap-6">
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
+              <div>
+                <h2 className="text-2xl font-bold text-white flex items-center gap-2">
+                  <Activity className="text-emerald-400 w-6 h-6" /> Live GPS
+                  Tracking
+                </h2>
+                <p className="text-sm text-slate-400 mt-1">
+                  Monitor real-time locations of users who have GPS enabled.
+                </p>
+              </div>
+            </div>
+
+            <div className="glass-card rounded-xl overflow-hidden border border-white/10">
+              <table className="w-full text-left text-sm text-slate-300">
+                <thead className="bg-white/5 text-slate-400 uppercase text-xs">
+                  <tr>
+                    <th className="px-4 py-3">User</th>
+                    <th className="px-4 py-3">GPS Coordinates</th>
+                    <th className="px-4 py-3">Last Synced</th>
+                    <th className="px-4 py-3 text-right">Action</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-white/5">
+                  {approvedUsers
+                    .filter(
+                      (u) =>
+                        u.location &&
+                        typeof u.location === "object" &&
+                        u.location.lat,
+                    )
+                    .map((u) => (
+                      <tr
+                        key={u.id}
+                        className="hover:bg-white/5 transition-colors"
+                      >
+                        <td className="px-4 py-3">
+                          <div className="font-bold text-white">{u.name}</div>
+                          <div className="text-xs text-blue-400">
+                            {u.mobile}
+                          </div>
+                        </td>
+                        <td className="px-4 py-3 font-mono text-xs">
+                          {(u.location as any).lat.toFixed(6)},{" "}
+                          {(u.location as any).lng.toFixed(6)}
+                        </td>
+                        <td className="px-4 py-3">
+                          {(u.location as any).updatedAt
+                            ? new Date(
+                                (u.location as any).updatedAt,
+                              ).toLocaleString()
+                            : "Unknown"}
+                        </td>
+                        <td className="px-4 py-3 text-right">
+                          <a
+                            href={`https://www.google.com/maps/search/?api=1&query=${(u.location as any).lat},${(u.location as any).lng}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="px-3 py-1.5 bg-emerald-600/20 text-emerald-400 rounded hover:bg-emerald-600/40 transition-colors inline-block text-xs font-medium border border-emerald-500/30"
+                          >
+                            View Map
+                          </a>
+                        </td>
+                      </tr>
+                    ))}
+                  {approvedUsers.filter(
+                    (u) =>
+                      u.location &&
+                      typeof u.location === "object" &&
+                      u.location.lat,
+                  ).length === 0 && (
+                    <tr>
+                      <td
+                        colSpan={4}
+                        className="px-4 py-8 text-center text-slate-500"
+                      >
+                        No users currently have real-time GPS tracking enabled.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+        {/* MONITOR TAB */}
+        {activeTab === "monitor" && (
+          <MonitorTab
+            chats={chats}
+            aiChats={aiChats}
+            searchLogs={searchLogs}
+            clickLogs={clickLogs}
+            handleAdminDeleteMessage={handleAdminDeleteMessage}
+            getUsernameById={getUsernameById}
+          />
+        )}
+
+        {/* CATEGORIES TAB */}
+        {activeTab === "categories" && (
+          <div className="grid gap-6">
+            <div className="glass-panel p-6 rounded-2xl border border-blue-500/20 mb-6">
+              <h2 className="text-xl font-bold text-white mb-2 flex items-center gap-2">
+                <Bot className="w-6 h-6 text-blue-400" /> Category Manager
+                (3-State)
+              </h2>
+              <p className="text-slate-400 text-sm mb-6">
+                Manage visibility of categories on the dashboard. You can set
+                them to Active, Pending (shows maintenance message), or Hidden.
+              </p>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {coreCategories.map((cat) => {
+                  const catData = categoriesControl[cat.id] || {
+                    state: "active",
+                    lockMessage: "Pending",
+                  };
+                  // Backwards compatibility with old isLocked logic
+                  if (!catData.state && catData.isLocked !== undefined) {
+                    catData.state = catData.isLocked ? "pending" : "active";
+                  }
+
+                  return (
+                    <div
+                      key={cat.id}
+                      className={`glass-card p-5 rounded-xl border ${catData.state !== "active" ? "border-red-500/30 bg-red-500/5" : "border-white/10"}`}
+                    >
+                      <div className="flex items-center justify-between mb-4">
+                        <h3 className="font-bold text-white">{cat.label}</h3>
+                        <select
+                          value={catData.state || "active"}
+                          onChange={(e) =>
+                            handleUpdateCategoryState(cat.id, e.target.value)
+                          }
+                          className="bg-black/50 border border-white/20 text-white text-xs rounded-lg focus:ring-blue-500 focus:border-blue-500 p-1 outline-none"
+                        >
+                          <option value="active">🟢 Active</option>
+                          <option value="pending">🟡 Pending</option>
+                          <option value="hidden">🔴 Hidden</option>
+                        </select>
+                      </div>
+
+                      {catData.state === "pending" && (
+                        <div className="space-y-2 mt-4 pt-4 border-t border-white/5">
+                          <label className="text-xs text-slate-400">
+                            Lock Message to Show Users
+                          </label>
+                          <div className="flex gap-2">
+                            <input
+                              type="text"
+                              defaultValue={catData.lockMessage || "Pending"}
+                              onBlur={(e) =>
+                                handleUpdateCategoryMessage(
+                                  cat.id,
+                                  e.target.value,
+                                )
+                              }
+                              className="w-full bg-black/20 border border-white/10 rounded-lg p-2 text-sm text-white focus:outline-none focus:ring-1 focus:ring-blue-500"
+                            />
+                            <button
+                              onClick={(e) => {
+                                const input = e.currentTarget
+                                  .previousElementSibling as HTMLInputElement;
+                                handleUpdateCategoryMessage(
+                                  cat.id,
+                                  input.value,
+                                );
+                              }}
+                              className="px-3 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-sm transition-colors"
+                            >
+                              Save
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* SETTINGS TAB */}
+        {activeTab === "settings" && (
+          <SettingsTab
+            youtubeApiKey={youtubeApiKey}
+            setYoutubeApiKey={setYoutubeApiKey}
+            savingYoutubeKey={savingYoutubeKey}
+            handleSaveYoutubeApiKey={handleSaveYoutubeApiKey}
+            globalPrivacy={globalPrivacy}
+            handleToggleGlobalPrivacy={handleToggleGlobalPrivacy}
+            features={features}
+            handleChangeFeatureState={handleChangeFeatureState}
+            adType={adType}
+            setAdType={setAdType}
+            adTitle={adTitle}
+            setAdTitle={setAdTitle}
+            adDesc={adDesc}
+            setAdDesc={setAdDesc}
+            adImageUrl={adImageUrl}
+            setAdImageUrl={setAdImageUrl}
+            adLink={adLink}
+            setAdLink={setAdLink}
+            savingAd={savingAd}
+            handleSaveAd={handleSaveAd}
+            youtubeEmbed={youtubeEmbed}
+            setYoutubeEmbed={setYoutubeEmbed}
+            savingYoutube={savingYoutube}
+            handleSaveYoutube={handleSaveYoutube}
+            handleBackup={handleBackup}
+          />
+        )}
+
+        {/* COMPLIANCE TAB */}
+        {activeTab === "compliance" && <ComplianceTab />}
+      </main>
+
+      {/* Admin Direct Edit Modal */}
+      {editingUser && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm overflow-y-auto pt-24 pb-12">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="w-full max-w-lg glass-panel rounded-2xl p-6 relative my-auto"
+          >
+            <div className="flex items-center gap-4 mb-6">
+              <button
+                onClick={() => setEditingUser(null)}
+                className="w-10 h-10 rounded-xl bg-white/5 flex items-center justify-center border border-white/10 hover:bg-white/10 transition-colors"
+              >
+                <X className="text-slate-300 w-5 h-5" />
+              </button>
+              <h2 className="text-xl md:text-2xl font-bold text-white">
+                Edit User: {editingUser.name}
+              </h2>
+            </div>
+
+            <form onSubmit={handleDirectEditSave} className="space-y-4">
+              <div>
+                <label className="text-sm text-slate-400 mb-1 block">
+                  Full Name
+                </label>
+                <input
+                  type="text"
+                  value={editingUser.name || ""}
+                  onChange={(e) =>
+                    setEditingUser({ ...editingUser, name: e.target.value })
+                  }
+                  className="w-full bg-white/5 border border-white/10 rounded-lg p-3 text-white"
+                />
+              </div>
+              <div>
+                <label className="text-sm text-slate-400 mb-1 block">
+                  Father's Name
+                </label>
+                <input
+                  type="text"
+                  value={editingUser.father || ""}
+                  onChange={(e) =>
+                    setEditingUser({ ...editingUser, father: e.target.value })
+                  }
+                  className="w-full bg-white/5 border border-white/10 rounded-lg p-3 text-white"
+                />
+              </div>
+              <div>
+                <label className="text-sm text-slate-400 mb-1 block">
+                  Location / Ward
+                </label>
+                <input
+                  type="text"
+                  value={editingUser.location || ""}
+                  onChange={(e) =>
+                    setEditingUser({ ...editingUser, location: e.target.value })
+                  }
+                  className="w-full bg-white/5 border border-white/10 rounded-lg p-3 text-white"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="text-sm text-slate-400 mb-1 block">
+                    Gram Panchayat
+                  </label>
+                  <input
+                    type="text"
+                    value={editingUser.gram_panchayat || ""}
+                    onChange={(e) =>
+                      setEditingUser({
+                        ...editingUser,
+                        gram_panchayat: e.target.value,
+                      })
+                    }
+                    className="w-full bg-white/5 border border-white/10 rounded-lg p-3 text-white"
+                    placeholder="Panchayat Name"
+                  />
+                </div>
+                <div>
+                  <label className="text-sm text-slate-400 mb-1 block">
+                    Pincode
+                  </label>
+                  <input
+                    type="text"
+                    maxLength={6}
+                    value={editingUser.pincode || ""}
+                    onChange={(e) =>
+                      setEditingUser({
+                        ...editingUser,
+                        pincode: e.target.value.replace(/\D/g, ""),
+                      })
+                    }
+                    className="w-full bg-white/5 border border-white/10 rounded-lg p-3 text-white"
+                    placeholder="343030"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="text-sm text-slate-400 mb-1 block">
+                  Category / Profession
+                </label>
+                <input
+                  type="text"
+                  value={editingUser.profession || ""}
+                  onChange={(e) =>
+                    setEditingUser({
+                      ...editingUser,
+                      profession: e.target.value,
+                    })
+                  }
+                  className="w-full bg-white/5 border border-white/10 rounded-lg p-3 text-white"
+                  placeholder="e-Mitra, Student"
+                />
+              </div>
+
+              <div>
+                <label className="text-sm text-slate-400 mb-1 block">
+                  Platform Role
+                </label>
+                <select
+                  value={editingUser.role || "user"}
+                  onChange={(e) =>
+                    setEditingUser({ ...editingUser, role: e.target.value })
+                  }
+                  className="w-full bg-white/5 border border-white/10 rounded-lg p-3 text-white"
+                >
+                  <option value="user">Normal User</option>
+                  <option value="head">Head (Teacher / Moderator)</option>
+                  <option value="admin">Admin</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="text-sm text-slate-400 mb-1 block">
+                  Password
+                </label>
+                <input
+                  type="text"
+                  value={editingUser.password || ""}
+                  onChange={(e) =>
+                    setEditingUser({ ...editingUser, password: e.target.value })
+                  }
+                  className="w-full bg-white/5 border border-white/10 rounded-lg p-3 text-white"
+                />
+              </div>
+              <div className="flex items-center gap-3 p-3 rounded-lg bg-white/5 border border-white/10 mt-2">
+                <input
+                  type="checkbox"
+                  id="forceMask"
+                  checked={editingUser.force_mask || false}
+                  onChange={(e) =>
+                    setEditingUser({
+                      ...editingUser,
+                      force_mask: e.target.checked,
+                    })
+                  }
+                  className="w-5 h-5 rounded"
+                />
+                <label htmlFor="forceMask" className="text-sm text-slate-300">
+                  Force Mask (Hide Details for Normal Users)
+                </label>
+              </div>
+              <button
+                type="submit"
+                className="w-full py-3 rounded-xl bg-blue-600 text-white font-medium flex items-center justify-center gap-2 mt-4 hover:bg-blue-500"
+              >
+                <Save className="w-4 h-4" /> Save Changes Immediately
+              </button>
+            </form>
+          </motion.div>
+        </div>
+      )}
+
+      {/* INBOX TAB */}
+      {activeTab === "inbox" && (
+        <div className="grid gap-6">
+          <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
+            <h2 className="text-2xl font-bold text-white flex items-center gap-2">
+              <MessageSquare className="text-blue-400 w-6 h-6" /> Live Support
+              Inbox
+            </h2>
+            <button
+              onClick={() => {
+                const num = window.prompt(
+                  "Enter 10-digit mobile number of the user to send a direct message:",
+                );
+                if (num && num.length === 10) {
+                  const msg = window.prompt("Enter your message:");
+                  if (msg) {
+                    const chatId = `+91${num}`;
+                    update(ref(db, `support_chats/${chatId}/meta`), {
+                      unreadByAdmin: false,
+                      mobile: num,
+                      name: "Direct Message",
+                    });
+                    set(
+                      ref(db, `support_chats/${chatId}/messages/${Date.now()}`),
+                      { text: msg, sender: "admin", timestamp: Date.now() },
+                    );
+                    alert("Message sent successfully!");
+                  }
+                } else if (num) {
+                  alert("Invalid mobile number. Must be 10 digits.");
+                }
+              }}
+              className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg font-medium text-sm transition-colors shadow-lg shadow-blue-500/20"
+            >
+              + New Direct Message
+            </button>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {supportChats
+              .sort(
+                (a, b) =>
+                  (b.meta?.unreadByAdmin ? 1 : 0) -
+                  (a.meta?.unreadByAdmin ? 1 : 0),
+              )
+              .map((chat, idx) => (
+                <motion.div
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: idx * 0.1 }}
+                  key={chat.id}
+                  className="glass-card p-5 relative border-t-2 border-t-blue-500/50"
+                >
+                  <div className="flex justify-between items-start mb-4">
+                    <div>
+                      <h3 className="font-bold text-white">
+                        {chat.meta?.name || "Unknown User"}
+                      </h3>
+                      <p className="text-sm text-blue-400 font-medium">
+                        {chat.meta?.mobile || chat.id}
+                      </p>
+                    </div>
+                    {chat.meta?.unreadByAdmin && (
+                      <span className="px-2 py-1 bg-red-500/20 text-red-400 text-[10px] font-bold rounded-full border border-red-500/50 animate-pulse">
+                        NEW MESSAGE
+                      </span>
+                    )}
+                  </div>
+                  <div className="bg-black/30 border border-white/10 rounded-xl p-3 h-56 overflow-y-auto mb-4 flex flex-col gap-2">
+                    {chat.messages &&
+                      Object.values(chat.messages).map((m: any, i) => (
+                        <div
+                          key={i}
+                          className={`text-xs p-2.5 rounded-lg max-w-[90%] ${m.sender === "user" ? "bg-white/10 text-slate-200 self-start" : "bg-blue-600/40 text-blue-100 self-end border border-blue-500/30"}`}
+                        >
+                          {m.text}
+                          <div
+                            className={`text-[9px] mt-1 opacity-50 ${m.sender === "user" ? "text-left" : "text-right"}`}
+                          >
+                            {new Date(m.timestamp).toLocaleTimeString()}
+                          </div>
+                        </div>
+                      ))}
+                  </div>
+                  <form
+                    onSubmit={async (e) => {
+                      e.preventDefault();
+                      const form = e.target as HTMLFormElement;
+                      const input = form.elements.namedItem(
+                        "reply",
+                      ) as HTMLInputElement;
+                      if (!input.value.trim()) return;
+                      await update(ref(db, `support_chats/${chat.id}/meta`), {
+                        unreadByAdmin: false,
+                      });
+                      await set(
+                        ref(
+                          db,
+                          `support_chats/${chat.id}/messages/${Date.now()}`,
+                        ),
+                        {
+                          text: input.value,
+                          sender: "admin",
+                          timestamp: Date.now(),
+                        },
+                      );
+                      input.value = "";
+                    }}
+                    className="flex gap-2"
+                  >
+                    <input
+                      name="reply"
+                      type="text"
+                      placeholder="Type a reply..."
+                      className="flex-1 bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-blue-500"
+                    />
+                    <button
+                      type="submit"
+                      className="px-4 py-2 bg-blue-600 rounded-lg text-white font-medium hover:bg-blue-500 transition-colors"
+                    >
+                      Send
+                    </button>
+                  </form>
+                </motion.div>
+              ))}
+            {supportChats.length === 0 && (
+              <div className="col-span-full text-center p-12 text-slate-400 glass-card border border-white/5">
+                <MessageSquare className="w-12 h-12 text-slate-500 mx-auto mb-3 opacity-50" />
+                <p>No active support chats at the moment.</p>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* SECURITY TAB */}
+      {activeTab === "security" && (
+        <div className="grid gap-6">
+          <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
+            <h2 className="text-2xl font-bold text-white flex items-center gap-2">
+              <ShieldCheck className="text-red-400 w-6 h-6" /> Live Security &
+              Error Logs
+            </h2>
+            <button
+              onClick={async () => {
+                if (window.confirm("Clear all system logs?")) {
+                  await remove(ref(db, "system_logs"));
+                }
+              }}
+              className="bg-red-500/20 hover:bg-red-500/30 text-red-400 px-4 py-2 rounded-lg text-sm border border-red-500/30 transition-colors"
+            >
+              Clear All Logs
+            </button>
+          </div>
+
+          <div className="glass-panel p-6 rounded-2xl border border-red-500/20">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-sm text-slate-300">
+                <thead className="bg-white/5 text-slate-400 uppercase text-xs">
+                  <tr>
+                    <th className="px-4 py-3 rounded-tl-lg">Time</th>
+                    <th className="px-4 py-3">Type</th>
+                    <th className="px-4 py-3">User</th>
+                    <th className="px-4 py-3">Error Message</th>
+                    <th className="px-4 py-3 rounded-tr-lg">URL</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-white/5">
+                  {systemLogs.length === 0 ? (
+                    <tr>
+                      <td
+                        colSpan={5}
+                        className="text-center py-6 text-slate-500"
+                      >
+                        No logs captured yet. System is healthy.
+                      </td>
+                    </tr>
+                  ) : (
+                    systemLogs.map((log: any) => (
+                      <tr
+                        key={log.id}
+                        className="hover:bg-white/5 transition-colors"
+                      >
+                        <td className="px-4 py-3 whitespace-nowrap text-slate-400">
+                          {log.timestamp
+                            ? new Date(log.timestamp).toLocaleString("en-IN")
+                            : "N/A"}
+                        </td>
+                        <td className="px-4 py-3">
+                          <span
+                            className={`px-2 py-1 rounded text-xs font-bold ${log.type === "error" ? "bg-red-500/20 text-red-400" : "bg-orange-500/20 text-orange-400"}`}
+                          >
+                            {log.type}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3">
+                          <div className="text-white font-medium">
+                            {log.userMobile || "Guest"}
+                          </div>
+                          <div className="text-xs text-slate-500">
+                            {log.userId}
+                          </div>
+                        </td>
+                        <td
+                          className="px-4 py-3 max-w-xs truncate"
+                          title={log.stack || log.message}
+                        >
+                          {log.message}
+                        </td>
+                        <td className="px-4 py-3 truncate max-w-[150px] text-blue-400">
+                          {log.url}
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ARCHIVED TAB */}
+      {activeTab === "archived" && (
+        <div className="grid gap-6">
+          <h2 className="text-2xl font-bold text-white mb-6 flex items-center gap-2">
+            <Users className="text-orange-400 w-6 h-6" /> Archived Users (Soft
+            Deleted)
+          </h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {archivedUsers.map((user, idx) => (
+              <motion.div
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: idx * 0.1 }}
+                key={user.id}
+                className="glass-card p-5 border-l-4 border-l-orange-500/50"
+              >
+                <div className="flex justify-between items-start mb-2">
+                  <div>
+                    <h3 className="font-bold text-white">{user.name}</h3>
+                    <p className="text-sm text-blue-400">{user.mobile}</p>
+                  </div>
+                </div>
+                <p className="text-xs text-orange-400 bg-orange-500/10 p-2 rounded border border-orange-500/20 mb-4">
+                  Reason: {user.deleteReason}
+                </p>
+                <button
+                  onClick={async () => {
+                    if (
+                      window.confirm(
+                        "Restore this user back to approved directory?",
+                      )
+                    ) {
+                      await update(ref(db, `approved_users/${user.id}`), {
+                        ...user,
+                        deleteReason: null,
+                        deletedAt: null,
+                      });
+                      await remove(ref(db, `rejected_users/${user.mobile}`));
+                      await remove(ref(db, `archived_users/${user.id}`));
+                    }
+                  }}
+                  className="w-full py-2 bg-white/10 hover:bg-white/20 rounded-lg text-sm font-medium text-white transition-colors border border-white/10"
+                >
+                  Restore User
+                </button>
+              </motion.div>
+            ))}
+            {archivedUsers.length === 0 && (
+              <div className="col-span-full text-center p-12 text-slate-400 glass-card">
+                No archived users found.
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Ban User Modal */}
+      {banModalUser && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="w-full max-w-sm glass-panel border border-orange-500/30 rounded-2xl p-6 relative"
+          >
+            <button
+              onClick={() => setBanModalUser(null)}
+              className="absolute top-4 right-4 w-8 h-8 rounded-full bg-white/10 flex items-center justify-center text-white hover:bg-white/20 z-10 transition-colors"
+            >
+              <X className="w-5 h-5" />
+            </button>
+            <h2 className="text-xl font-bold text-orange-400 mb-2">
+              Ban {banModalUser.name}?
+            </h2>
+            <p className="text-sm text-slate-300 mb-6">
+              Select duration. Banned users cannot login or register with this
+              number.
+            </p>
+
+            <form onSubmit={handleBanSubmit} className="space-y-4">
+              <select
+                value={banDuration}
+                onChange={(e) => setBanDuration(e.target.value)}
+                className="w-full bg-white/5 border border-white/10 rounded-lg p-3 text-white"
+              >
+                <option value="permanent">Permanent Ban</option>
+                <option value="1">1 Day</option>
+                <option value="7">7 Days</option>
+                <option value="30">30 Days</option>
+              </select>
+              <button
+                type="submit"
+                className="w-full py-3 rounded-xl bg-orange-600 text-white font-medium flex items-center justify-center gap-2 hover:bg-orange-500"
+              >
+                Confirm Ban
+              </button>
+            </form>
+          </motion.div>
+        </div>
+      )}
+
+      {/* Broadcast Modal */}
+      {showBroadcastModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="w-full max-w-lg glass-panel rounded-2xl p-6 relative border border-pink-500/30"
+          >
+            <button
+              onClick={() => setShowBroadcastModal(false)}
+              className="absolute top-4 right-4 w-8 h-8 rounded-full bg-white/10 flex items-center justify-center text-white hover:bg-white/20 z-10 transition-colors"
+            >
+              <X className="w-5 h-5" />
+            </button>
+            <h2 className="text-xl font-bold text-pink-400 mb-2 flex items-center gap-2">
+              <MessageSquare className="w-5 h-5" /> Broadcast to All
+            </h2>
+            <p className="text-sm text-slate-300 mb-6">
+              Send a message to all approved users instantly.
+            </p>
+
+            <form onSubmit={handleBroadcastSubmit} className="space-y-4">
+              <div>
+                <textarea
+                  value={broadcastText}
+                  onChange={(e) => setBroadcastText(e.target.value)}
+                  placeholder="Type your message..."
+                  className="w-full bg-white/5 border border-white/10 rounded-lg p-3 text-white h-32 resize-none"
+                />
+              </div>
+              <div>
+                <label className="text-sm text-slate-400 mb-1 block">
+                  Attach Photo (Optional)
+                </label>
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={handleBroadcastPhotoUpload}
+                  className="w-full text-sm text-slate-400 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-pink-500/20 file:text-pink-400 hover:file:bg-pink-500/30 cursor-pointer"
+                />
+                {broadcastPhotoUrl && (
+                  <img
+                    src={broadcastPhotoUrl}
+                    className="h-32 object-contain mt-2 rounded-lg"
+                  />
+                )}
+              </div>
+              <button
+                disabled={broadcastLoading}
+                type="submit"
+                className="w-full py-3 rounded-xl bg-pink-600 text-white font-medium flex items-center justify-center gap-2 mt-4 hover:bg-pink-500 disabled:opacity-50"
+              >
+                {broadcastLoading ? (
+                  <Loader2 className="w-5 h-5 animate-spin" />
+                ) : (
+                  "Send Broadcast"
+                )}
+              </button>
+            </form>
+          </motion.div>
+        </div>
+      )}
+    </div>
+  );
+}

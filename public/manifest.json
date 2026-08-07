@@ -1,0 +1,60 @@
+{
+  "id": "/",
+  "name": "APNA NIMBODA",
+  "short_name": "Apna Nimboda",
+  "description": "Smart Digital Village App for Nimboda (343029), Bhinmal, Jalore, Rajasthan",
+  "start_url": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0f172a",
+  "theme_color": "#0f172a",
+  "scope": "/",
+  "lang": "hi",
+  "categories": ["social", "lifestyle"],
+  "icons": [
+    {
+      "src": "/icon-192.jpg",
+      "sizes": "192x192",
+      "type": "image/jpeg",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-192.jpg",
+      "sizes": "192x192",
+      "type": "image/jpeg",
+      "purpose": "maskable"
+    },
+    {
+      "src": "/icon-512.jpg",
+      "sizes": "512x512",
+      "type": "image/jpeg",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-512.jpg",
+      "sizes": "512x512",
+      "type": "image/jpeg",
+      "purpose": "maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "AI Chat",
+      "short_name": "AI",
+      "description": "Chat with AINimboda",
+      "url": "/ai",
+      "icons": [{ "src": "/icons/ai.jpg", "sizes": "96x96" }]
+    },
+    {
+      "name": "Village Directory",
+      "short_name": "Directory",
+      "description": "Search village members",
+      "url": "/dashboard",
+      "icons": [{ "src": "/icons/directory.jpg", "sizes": "96x96" }]
+    }
+  ],
+  "prefer_related_applications": false,
+  "edge_side_panel": {
+    "preferred_width": 480
+  }
+}
