@@ -85,25 +85,36 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const checkUserStatus = async (currentUser: User) => {
     setLoading(true);
-
-    // Check if banned
-    const banRefLive = ref(db, `banned_users/${currentUser.mobile}`);
-    onValue(banRefLive, (snap) => {
-      if (snap.exists()) {
-        const banData = snap.val();
-        if (!banData.bannedUntil || banData.bannedUntil > Date.now()) {
-          alert("You have been banned by the Administrator.");
-          logout();
-          window.location.replace("/login");
-        }
+    try {
+      if (!currentUser.mobile) {
+        throw new Error("Missing mobile number for user.");
       }
-    });
+      // Check if banned
+      const banRefLive = ref(db, `banned_users/${currentUser.mobile}`);
+      onValue(banRefLive, (snap) => {
+        if (snap.exists()) {
+          const banData = snap.val();
+          if (!banData.bannedUntil || banData.bannedUntil > Date.now()) {
+            alert("You have been banned by the Administrator.");
+            logout();
+            window.location.replace("/login");
+          }
+        }
+      });
 
-    // We no longer rely purely on local DB checks for admin because the server validates it.
-    setIsAdmin(currentUser.role === "admin");
-    setIsApproved(true);
-
-    setLoading(false);
+      // We no longer rely purely on local DB checks for admin because the server validates it.
+      setIsAdmin(currentUser.role === "admin");
+      setIsApproved(true);
+    } catch (err) {
+      console.error("Error in checkUserStatus:", err);
+      // If there is an error (e.g. malformed user), log them out
+      try {
+        localStorage.removeItem("tanumanu_user");
+      } catch (e) {}
+      setUser(null);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const login = async (mobile: string, pass: string) => {
