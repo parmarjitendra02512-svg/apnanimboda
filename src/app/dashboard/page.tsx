@@ -218,6 +218,11 @@ export default function Dashboard() {
       setLoading(false);
     });
 
+    // SAFETY TIMEOUT: If Firebase doesn't respond in 10 seconds, stop loading
+    const dashboardTimer = setTimeout(() => {
+      setLoading(false);
+    }, 10000);
+
     // Check for admin broadcast messages
     const userId = user.uid || user.mobile;
     const chatId = ["admin_config_master", userId].sort().join("_");

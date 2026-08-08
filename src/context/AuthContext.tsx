@@ -34,9 +34,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   // Re-hydrate session from localStorage (since we aren't using Firebase Auth)
-  // Re-hydrate session from localStorage (since we aren't using Firebase Auth)
   useEffect(() => {
     let hasValidUser = false;
+    
+    // SAFETY TIMEOUT: Never stay loading for more than 5 seconds
+    // This prevents blank screen on slow mobile networks
+    const safetyTimer = setTimeout(() => {
+      setLoading(false);
+    }, 5000);
+    
     try {
       const savedUser = localStorage.getItem("tanumanu_user");
       if (savedUser) {
@@ -69,7 +75,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               }
             }
           });
-          return () => unsubscribe();
+          return () => {
+            clearTimeout(safetyTimer);
+            unsubscribe();
+          };
         }
       }
     } catch (e) {
@@ -79,8 +88,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // Only set loading false if no valid user is found. 
     // If valid user exists, checkUserStatus will handle setLoading(false).
     if (!hasValidUser) {
+      clearTimeout(safetyTimer);
       setLoading(false);
     }
+    
+    return () => clearTimeout(safetyTimer);
   }, []);
 
   const checkUserStatus = async (currentUser: User) => {
@@ -212,7 +224,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     <AuthContext.Provider
       value={{ user, loading, isAdmin, isApproved, login, register, logout }}
     >
-      {!loading && children}
+      {loading ? (
+        <div className="min-h-screen flex items-center justify-center bg-black">
+          <div className="text-center">
+            <div className="w-12 h-12 border-4 border-cyan-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+            <p className="text-white/60 text-sm animate-pulse">Loading...</p>
+          </div>
+        </div>
+      ) : children}
     </AuthContext.Provider>
   );
 }
