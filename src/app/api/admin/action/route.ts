@@ -1,3 +1,4 @@
+export const dynamic = 'force-dynamic';
 import { NextResponse } from "next/server";
 import { getServerDb } from "@/lib/firebase-server";
 import { verifyAuth } from "@/lib/auth";
