@@ -43,10 +43,8 @@ export async function verifyAuth(requireAdmin = false) {
   }
 }
 
-// ─── Simple rate limiter for serverless (Supabase-backed) ───
-// Note: The in-memory Map rate limiters in individual routes don't work
-// reliably on serverless. Use this for lightweight protection.
-import { getServerSupabase } from "./supabase-server";
+// ─── Simple rate limiter for serverless (Firebase-backed) ───
+import { getServerDb } from "./firebase-server";
 
 export async function checkServerRateLimit(
   identifier: string,
@@ -55,43 +53,30 @@ export async function checkServerRateLimit(
   windowMs: number
 ): Promise<boolean> {
   try {
-    const supabase = getServerSupabase();
-    const sanitizedId = identifier || "unknown";
+    const db = await getServerDb();
+    const sanitizedId = (identifier || "unknown").replace(/[.#$[\]]/g, "_");
+    const ref = db.ref(`rate_limits/${sanitizedId}_${action}`);
 
-    const { data, error } = await supabase
-      .from("rate_limits")
-      .select("*")
-      .eq("ip", sanitizedId)
-      .eq("action", action)
-      .single();
-
+    const snapshot = await ref.get();
     const now = Date.now();
 
-    if (data) {
+    if (snapshot.exists()) {
+      const data = snapshot.val();
+      
       if (now - parseInt(data.start_time) > windowMs) {
-        await supabase
-          .from("rate_limits")
-          .update({ count: 1, start_time: now.toString() })
-          .eq("id", data.id);
+        await ref.update({ count: 1, start_time: now.toString() });
         return true;
       }
       if (data.count >= maxRequests) {
         return false;
       }
-      await supabase
-        .from("rate_limits")
-        .update({ count: data.count + 1 })
-        .eq("id", data.id);
+      await ref.update({ count: data.count + 1 });
       return true;
     } else {
-      await supabase
-        .from("rate_limits")
-        .insert({
-          ip: sanitizedId,
-          action: action,
-          count: 1,
-          start_time: now.toString(),
-        });
+      await ref.set({
+        count: 1,
+        start_time: now.toString(),
+      });
       return true;
     }
   } catch (error) {

@@ -39,34 +39,12 @@ export async function POST(req: Request) {
       const userData = userSnap.val();
       userData.mobile = newMobile; // Update mobile number in object
 
-      // 2. Update Supabase users table
-      const { getServerSupabase } = await import("@/lib/supabase-server");
-      const supabase = getServerSupabase();
-      
-      const { error: sbError } = await supabase
-        .from("users")
-        .update({ mobile: newMobile })
-        .eq("mobile", oldMobile);
-
-      if (sbError) {
-        console.error("Supabase update error:", sbError);
-        return NextResponse.json({ error: "Failed to update Supabase" }, { status: 500 });
-      }
-
       // 3. Move Firebase data
       await db.ref(`approved_users/${newMobile}`).set(userData);
       await db.ref(`approved_users/${oldMobile}`).remove();
       
       // 4. Clean up pending request
       await db.ref(`pending_mobile_updates/${oldMobile}`).remove();
-      
-      // 5. Update auth_requests status
-      await supabase
-        .from("auth_requests")
-        .update({ status: "approved" })
-        .eq("mobile", oldMobile)
-        .eq("request_type", "mobile_update")
-        .eq("status", "pending");
 
       return NextResponse.json({ success: true });
     }
@@ -75,15 +53,6 @@ export async function POST(req: Request) {
       const { oldMobile } = payload;
       
       await db.ref(`pending_mobile_updates/${oldMobile}`).remove();
-      
-      const { getServerSupabase } = await import("@/lib/supabase-server");
-      const supabase = getServerSupabase();
-      await supabase
-        .from("auth_requests")
-        .update({ status: "rejected" })
-        .eq("mobile", oldMobile)
-        .eq("request_type", "mobile_update")
-        .eq("status", "pending");
 
       return NextResponse.json({ success: true });
     }

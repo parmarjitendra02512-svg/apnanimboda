@@ -1,4 +1,4 @@
-import { getServerSupabase } from "./supabase-server";
+import { getServerDb } from "./firebase-server";
 
 export async function checkRateLimit(
   ip: string,
@@ -7,27 +7,19 @@ export async function checkRateLimit(
   windowMs: number,
 ): Promise<boolean> {
   try {
-    const supabase = getServerSupabase();
-    // We can use the raw IP in Supabase, no need to sanitize dots
-    const sanitizedIp = ip || "unknown"; 
+    const db = await getServerDb();
+    const sanitizedIp = ip.replace(/[.#$[\]]/g, "_") || "unknown";
+    const ref = db.ref(`rate_limits/${sanitizedIp}_${action}`);
 
-    // Fetch existing rate limit record
-    const { data, error } = await supabase
-      .from("rate_limits")
-      .select("*")
-      .eq("ip", sanitizedIp)
-      .eq("action", action)
-      .single();
-
+    const snapshot = await ref.get();
     const now = Date.now();
 
-    if (data) {
+    if (snapshot.exists()) {
+      const data = snapshot.val();
+      
       // If window has passed, reset
       if (now - parseInt(data.start_time) > windowMs) {
-        await supabase
-          .from("rate_limits")
-          .update({ count: 1, start_time: now.toString() })
-          .eq("id", data.id);
+        await ref.update({ count: 1, start_time: now.toString() });
         return true;
       }
 
@@ -37,21 +29,14 @@ export async function checkRateLimit(
       }
 
       // Increment count
-      await supabase
-        .from("rate_limits")
-        .update({ count: data.count + 1 })
-        .eq("id", data.id);
+      await ref.update({ count: data.count + 1 });
       return true;
     } else {
       // First request - create new record
-      await supabase
-        .from("rate_limits")
-        .insert({
-          ip: sanitizedIp,
-          action: action,
-          count: 1,
-          start_time: now.toString(),
-        });
+      await ref.set({
+        count: 1,
+        start_time: now.toString(),
+      });
       return true;
     }
   } catch (error) {
@@ -59,6 +44,7 @@ export async function checkRateLimit(
     return false; // Fail closed - deny if rate limiting fails
   }
 }
+
 export function getIp(req: Request): string {
   const forwardedFor = req.headers.get("x-forwarded-for");
   if (forwardedFor) {

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
-import { getServerSupabase } from "@/lib/supabase-server";
 import { verifyAuth, getRequestIp, checkServerRateLimit } from "@/lib/auth";
+import { getServerDb } from "@/lib/firebase-server";
 
 export async function POST(req: Request) {
   try {
@@ -32,65 +32,32 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "New mobile number must be different from current." }, { status: 400 });
     }
 
-    const supabase = getServerSupabase();
+    const db = await getServerDb();
 
     // 4. Check if new mobile number is already taken in users
-    const { data: existingUser } = await supabase
-      .from("users")
-      .select("id")
-      .eq("mobile", cleanNewMobile)
-      .single();
+    const existingSnap = await db.ref(`approved_users/${cleanNewMobile}`).get();
 
-    if (existingUser) {
+    if (existingSnap.exists()) {
       return NextResponse.json({ error: "This mobile number is already registered to another account." }, { status: 400 });
     }
 
     // 5. Check if a pending request already exists for this user
-    const { data: pendingRequest } = await supabase
-      .from("auth_requests")
-      .select("id")
-      .eq("mobile", oldMobile)
-      .eq("request_type", "mobile_update")
-      .eq("status", "pending")
-      .single();
+    const pendingSnap = await db.ref(`pending_mobile_updates/${oldMobile}`).get();
 
-    if (pendingRequest) {
+    if (pendingSnap.exists()) {
       return NextResponse.json({ error: "You already have a pending mobile number update request." }, { status: 400 });
     }
 
     // 6. Check if anyone else has a pending request to claim this new mobile number
-    const { data: claimingRequest } = await supabase
-      .from("auth_requests")
-      .select("id")
-      .eq("request_type", "mobile_update")
-      .eq("status", "pending")
-      .contains("data", { new_mobile: cleanNewMobile });
-
-    if (claimingRequest && claimingRequest.length > 0) {
+    // We would need to query all pending_mobile_updates, but Firebase Realtime Database makes complex queries hard.
+    // For now, we will fetch all pending updates and check manually.
+    const allPendingSnap = await db.ref("pending_mobile_updates").orderByChild("newMobile").equalTo(cleanNewMobile).get();
+    
+    if (allPendingSnap.exists()) {
       return NextResponse.json({ error: "This mobile number is currently involved in another pending request." }, { status: 400 });
     }
 
-    // 7. Insert the request into Supabase (for persistent record)
-    const { error: insertError } = await supabase
-      .from("auth_requests")
-      .insert({
-        mobile: oldMobile,
-        request_type: "mobile_update",
-        status: "pending",
-        data: {
-          name: user.name,
-          new_mobile: cleanNewMobile,
-        }
-      });
-
-    if (insertError) {
-      console.error("Insert mobile update error:", insertError);
-      return NextResponse.json({ error: "Failed to submit request" }, { status: 500 });
-    }
-
-    // 8. Insert into Firebase for Realtime Admin Panel
-    const { getServerDb } = await import("@/lib/firebase-server");
-    const db = await getServerDb();
+    // 7. Insert into Firebase for Realtime Admin Panel
     await db.ref(`pending_mobile_updates/${oldMobile}`).set({
       oldMobile: oldMobile,
       newMobile: cleanNewMobile,

@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getServerSupabase } from "@/lib/supabase-server";
+import { getServerDb } from "@/lib/firebase-server";
 import bcrypt from "bcryptjs";
 import { SignJWT } from "jose";
 import { cookies } from "next/headers";
@@ -44,7 +44,7 @@ export async function POST(req: Request) {
     const { mobile, password, isSecretDoor } = validatedData.data;
     const cleanMobile = mobile;
 
-    // Admin Login via env-based credentials (no hardcoded password)
+    // Admin Login via env-based credentials
     const adminMobile = ADMIN_MOBILE;
     const adminPasswordHash = process.env.ADMIN_PASSWORD_HASH || "$2b$10$1asfn6EVLUOHkOHNI59quOqFQdAVCGnWqrGU72Aal2KY/GD.CWKAe";
 
@@ -87,25 +87,16 @@ export async function POST(req: Request) {
       }
     }
 
-    const supabase = getServerSupabase();
+    const db = await getServerDb();
     
     // Check if approved user
-    const { data: userData, error: userError } = await supabase
-      .from("users")
-      .select("id, mobile, name, role, is_approved, password_hash, father_name, created_at")
-      .eq("mobile", cleanMobile)
-      .single();
+    const userSnap = await db.ref(`approved_users/${cleanMobile}`).get();
+    let userData = userSnap.val();
 
     if (!userData) {
       // Check if they are pending
-      const { data: pendingData } = await supabase
-        .from("auth_requests")
-        .select("*")
-        .eq("mobile", cleanMobile)
-        .eq("status", "pending")
-        .single();
-        
-      if (pendingData) {
+      const pendingSnap = await db.ref(`pending_requests/${cleanMobile}`).get();
+      if (pendingSnap.exists()) {
         return NextResponse.json(
           { error: "Your account is waiting for admin approval." },
           { status: 403 },
@@ -117,7 +108,7 @@ export async function POST(req: Request) {
       );
     }
 
-    if (!userData.is_approved && userData.role !== 'admin') {
+    if (!userData.is_approved && userData.role !== 'admin' && userData.status !== 'approved') {
        return NextResponse.json(
           { error: "Your account is waiting for admin approval." },
           { status: 403 },
@@ -126,9 +117,11 @@ export async function POST(req: Request) {
 
     let isValid = false;
 
-    // Only bcrypt hash comparison (plaintext removed for security)
+    // Password check
     if (userData.password_hash) {
       isValid = bcrypt.compareSync(password, userData.password_hash);
+    } else if (userData.passwordHash) {
+      isValid = bcrypt.compareSync(password, userData.passwordHash);
     }
 
     if (!isValid) {
@@ -157,6 +150,7 @@ export async function POST(req: Request) {
     // Remove sensitive data before sending to client
     const safeData: any = { ...userData };
     delete safeData.password_hash;
+    delete safeData.passwordHash;
 
     return NextResponse.json({ user: safeData, success: true });
   } catch (error: any) {

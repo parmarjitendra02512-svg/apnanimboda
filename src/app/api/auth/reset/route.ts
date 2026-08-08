@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getServerSupabase } from "@/lib/supabase-server";
+import { getServerDb } from "@/lib/firebase-server";
 
 import bcrypt from "bcryptjs";
 import { z } from "zod";
@@ -33,23 +33,20 @@ export async function POST(req: Request) {
     const { mobile, fatherName, newPassword } = validated.data;
     const cleanMobile = mobile;
 
-    const supabase = getServerSupabase();
+    const db = await getServerDb();
     
-    // Get user using Supabase
-    const { data: userData, error: userError } = await supabase
-      .from("users")
-      .select("id, name, father_name")
-      .eq("mobile", cleanMobile)
-      .single();
+    // Get user using Firebase
+    const userSnap = await db.ref(`approved_users/${cleanMobile}`).get();
+    const userData = userSnap.val();
 
-    if (userError || !userData) {
+    if (!userData) {
       return NextResponse.json({ error: "User not found" }, { status: 404 });
     }
 
     // Security check: verify father's name matches (case insensitive)
     if (
-      !userData.father_name ||
-      userData.father_name.toLowerCase().trim() !==
+      !userData.father ||
+      userData.father.toLowerCase().trim() !==
         fatherName.toLowerCase().trim()
     ) {
       return NextResponse.json(
@@ -61,37 +58,26 @@ export async function POST(req: Request) {
     const salt = bcrypt.genSaltSync(10);
     const passwordHash = bcrypt.hashSync(newPassword, salt);
 
-    // Instead of updating immediately, send to auth_requests for admin approval
+    // Instead of updating immediately, send to pending_resets for admin approval
     // Check if reset request already exists
-    const { data: existingReset } = await supabase
-        .from("auth_requests")
-        .select("id")
-        .eq("mobile", cleanMobile)
-        .eq("request_type", "password_reset")
-        .eq("status", "pending")
-        .single();
+    const existingResetSnap = await db.ref(`pending_resets/${cleanMobile}`).get();
 
-    if (existingReset) {
+    if (existingResetSnap.exists()) {
          return NextResponse.json(
           { error: "A pending password reset request already exists for this mobile number." },
           { status: 400 },
         );
     }
         
-    const { error: insertError } = await supabase
-      .from("auth_requests")
-      .insert({
+    try {
+      await db.ref(`pending_resets/${cleanMobile}`).set({
           mobile: cleanMobile,
-          request_type: "password_reset",
-          status: "pending",
-          data: {
-            name: userData.name,
-            requested_password_hash: passwordHash,
-          }
+          name: userData.name,
+          newPasswordHash: passwordHash,
+          requestedAt: Date.now()
       });
-
-    if (insertError) {
-         console.error("Supabase insert reset error:", insertError);
+    } catch (insertError: any) {
+         console.error("Firebase insert reset error:", insertError);
          return NextResponse.json(
           { error: "Failed to submit reset request" },
           { status: 500 },

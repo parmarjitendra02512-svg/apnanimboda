@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getServerSupabase } from "@/lib/supabase-server";
+import { getServerDb } from "@/lib/firebase-server";
 import bcrypt from "bcryptjs";
 import { checkRateLimit, getIp } from "@/lib/rate-limit";
 import { z } from "zod";
@@ -34,7 +34,7 @@ const registerSchema = z.object({
 
 export async function POST(req: Request) {
   try {
-    // 1. Payload Size Limit (Next.js Edge already limits to 4MB, but we can check Content-Length for strictness)
+    // 1. Payload Size Limit
     if (Number(req.headers.get("content-length")) > 100000) {
       return NextResponse.json({ error: "Payload too large" }, { status: 413 });
     }
@@ -62,24 +62,15 @@ export async function POST(req: Request) {
     const data = validatedData.data;
     const cleanMobile = data.mobile;
 
-    const supabase = getServerSupabase();
+    const db = await getServerDb();
 
-    // Check if user already exists
-    const { data: existingUser } = await supabase
-      .from("users")
-      .select("id")
-      .eq("mobile", cleanMobile)
-      .single();
+    // Check if user already exists in approved or pending
+    const existingSnap = await db.ref(`approved_users/${cleanMobile}`).get();
+    const pendingSnap = await db.ref(`pending_requests/${cleanMobile}`).get();
 
-    const { data: pendingUser } = await supabase
-      .from("auth_requests")
-      .select("id")
-      .eq("mobile", cleanMobile)
-      .single();
-
-    if (existingUser || pendingUser) {
+    if (existingSnap.exists() || pendingSnap.exists()) {
       return NextResponse.json(
-        { error: "Mobile number already registered" },
+        { error: "Mobile number already registered or pending approval." },
         { status: 400 },
       );
     }
@@ -90,36 +81,11 @@ export async function POST(req: Request) {
 
     const { password, ...restData } = data;
 
-    // Create user directly (auto-approved) in Supabase
-    const { error: insertError, data: newUserData } = await supabase
-      .from("users")
-      .insert({
-        mobile: cleanMobile,
-        name: restData.name,
-        father_name: restData.father,
-        email: restData.email || null,
-        password_hash: passwordHash,
-        role: "user",
-        is_approved: true
-      })
-      .select()
-      .single();
-
-    if (insertError) {
-      console.error("Supabase insert error:", insertError);
-      return NextResponse.json(
-        { error: "Failed to create account (SB): " + (insertError.message || JSON.stringify(insertError)) },
-        { status: 500 },
-      );
-    }
-
-    // Create user directly in Firebase (so frontend AuthContext works)
+    // Create user directly in Firebase pending_requests (admin approval required)
     try {
-      const { getServerDb } = await import("@/lib/firebase-server");
-      const db = await getServerDb();
-      await db.ref(`approved_users/${cleanMobile}`).set({
-        id: newUserData?.id || cleanMobile,
-        uid: newUserData?.id || cleanMobile,
+      await db.ref(`pending_requests/${cleanMobile}`).set({
+        id: cleanMobile,
+        uid: cleanMobile,
         mobile: cleanMobile,
         name: restData.name,
         father: restData.father,
@@ -128,21 +94,22 @@ export async function POST(req: Request) {
         profession: restData.profession || null,
         photoUrl: restData.photoUrl || null,
         role: "user",
-        status: "approved",
-        is_approved: true,
-        approvedAt: Date.now(),
+        status: "pending",
+        is_approved: false,
+        password_hash: passwordHash,
+        requestedAt: Date.now(),
       });
     } catch (firebaseErr: any) {
       console.error("Firebase insert error:", firebaseErr);
       return NextResponse.json(
-        { error: "Failed to create account (FB): " + firebaseErr.message },
+        { error: "Failed to create account: " + firebaseErr.message },
         { status: 500 },
       );
     }
 
     return NextResponse.json({
       success: true,
-      message: "Registration successful",
+      message: "Registration successful. Please wait for admin approval.",
     });
   } catch (error: any) {
     console.error("Register error:", error);
